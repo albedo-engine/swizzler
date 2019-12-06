@@ -1,0 +1,23 @@
+[package]
+name = "texture-packer-cli"
+description = "A CLI"
+repository = ""
+version = "0.1.0"
+authors = [
+    "David Peicho <david.peicho@gmail.com>"
+]
+edition = "2018"
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/albedo-engine/albedo-channel-packer"
+categories = ["multimedia::images"]
+keywords = ["texture", "packing", "rendering", "cli"]
+
+[[bin]]
+name = "texture-packer"
+path = "src/main.rs"
+bench = false
+
+[dependencies]
+texture-packer = { version = "0.1.0", path = "../lib" }
+structopt = "0.3.4"

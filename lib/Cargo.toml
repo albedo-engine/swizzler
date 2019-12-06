@@ -1,0 +1,19 @@
+[package]
+name = "texture-packer"
+description = ""
+repository = "https://github.com/albedo-engine/albedo-channel-packer"
+version = "0.1.0"
+authors = [
+    "David Peicho <david.peicho@gmail.com>"
+]
+edition = "2018"
+license = "MIT"
+readme = "README.md"
+homepage = "https://github.com/albedo-engine/albedo-channel-packer"
+categories = ["multimedia::images"]
+keywords = ["texture", "synthesis", "procedural"]
+
+[dependencies.image]
+version = "0.22.3"
+default-features = false
+features = [ "jpeg", "png_codec" ]
