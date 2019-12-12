@@ -4,9 +4,19 @@ enum Channel {
     R, G, B, A
 }
 
+struct CommandOption {
+    input_channel: Channel,
+    output_channel: Channel,
+    invert_input: bool
+}
+
 trait Command {
 
-    fn run(mut out: image::DynamicImage, input: image::DynamicImage) -> ();
+    fn run(
+        mut out: image::DynamicImage,
+        input: image::DynamicImage,
+        option: CommandOption
+    ) -> ();
 
 }
 
