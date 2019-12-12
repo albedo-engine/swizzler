@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use structopt::StructOpt;
 
+use texture_packer;
+
 #[derive(StructOpt)]
 #[structopt(
     name = "texture-synthesis",
@@ -18,7 +20,18 @@ fn main() {
     let args = Opt::from_args();
     let test = (args.input.to_str(), args.output.to_str());
     match test {
-        (Some(x), Some(y)) => println!("{} and {}", x, y),
-        _ => ()
+        (Some(x), Some(y)) => process(),
+        _ => (),
+    }
+}
+
+fn process() -> () {
+    if let Err(e) = texture_packer::exec() {
+        if atty::is(atty::Stream::Stderr) {
+            eprintln!("\x1b[31merror\x1b[0m: {}", e);
+        } else {
+            eprintln!("error: {}", e);
+        }
+        std::process::exit(1);
     }
 }
