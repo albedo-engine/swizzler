@@ -1,27 +1,73 @@
-pub use image;
+mod errors;
+use std::path::Path;
 
-enum Channel {
+pub type ImageResult = image::ImageResult<image::DynamicImage>;
+
+pub trait ImageLoader {
+
+    fn create_image(&self) -> ImageResult;
+
+}
+
+impl ImageLoader for String {
+    fn create_image(&self) -> ImageResult {
+        image::open(self)
+    }
+}
+
+impl ImageLoader for Path {
+
+    fn create_image(&self) -> ImageResult {
+        image::open(self)
+    }
+
+}
+
+/* impl ImageLoader for [u8] {
+
+    fn create_image(&self) -> ImageResult {
+        image::load_from_memory(self);
+    }
+
+} */
+
+pub enum Channel {
     R, G, B, A
 }
 
-struct CommandOption {
+pub enum ProcessStep {
+    Inverse,
+}
+
+pub struct Command<'a> {
+    img: &'a image::DynamicImage,
     input_channel: Channel,
     output_channel: Channel,
-    invert_input: bool
+    process_step: Option<ProcessStep>,
 }
 
-trait Command {
+impl Command<'_> {
 
-    fn run(
-        mut out: image::DynamicImage,
-        input: image::DynamicImage,
-        option: CommandOption
-    ) -> ();
+   pub fn new(
+        img: &image::DynamicImage,
+        input_channel: Channel,
+        output_channel: Channel,
+        process_step: Option<ProcessStep>
+    ) -> Command {
+        Command {
+            img,
+            input_channel,
+            output_channel,
+            process_step,
+        }
+    }
 
 }
 
-fn process(mut img: image::ImageBuffer) -> () {
+pub use errors::Error;
 
+pub fn load_image<T>(source: &T) -> ImageResult where T: ImageLoader {
+    source.create_image()
 }
 
 fn exec_internal(mut img: image::DynamicImage) -> () {

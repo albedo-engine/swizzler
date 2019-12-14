@@ -2,6 +2,9 @@ use std::path::PathBuf;
 use structopt::StructOpt;
 
 use texture_packer;
+use texture_packer::{
+    Error
+};
 
 #[derive(StructOpt)]
 #[structopt(
@@ -16,21 +19,21 @@ struct Opt {
     output: PathBuf,
 }
 
-fn main() {
-    let args = Opt::from_args();
-    let test = (args.input.to_str(), args.output.to_str());
-    match test {
-        (Some(x), Some(y)) => process(),
-        _ => (),
+fn process() -> Result<(), texture_packer::Error> {
+    let img = texture_packer::load_image(&String::from("./cat.png"));
+    match img {
+        Ok(i) => Ok(println!("YESSSS NOICE")),
+        Err(e) => Err(Error::Image(e)),
     }
 }
 
-fn process() -> () {
-    if let Err(e) = texture_packer::exec() {
+fn main() {
+    let args = Opt::from_args();
+    if let Err(e) = process() {
         if atty::is(atty::Stream::Stderr) {
-            eprintln!("\x1b[31merror\x1b[0m: {}", e);
+            eprintln!("\x1b[31merror\x1b[0m: {}", "noees");
         } else {
-            eprintln!("error: {}", e);
+            eprintln!("error: {}", "noees");
         }
         std::process::exit(1);
     }
