@@ -22,3 +22,8 @@ bench = false
 texture-packer = { version = "0.1.0", path = "../lib" }
 structopt = "0.3.4"
 atty = "0.2.13"
+
+[dependencies.image]
+version = "0.22.3"
+default-features = false
+features = [ "jpeg", "png_codec" ]

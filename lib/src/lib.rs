@@ -1,4 +1,7 @@
+pub use errors::Error;
+
 mod errors;
+use image;
 use std::path::Path;
 
 pub type ImageResult = image::ImageResult<image::DynamicImage>;
@@ -31,8 +34,12 @@ impl ImageLoader for Path {
 
 } */
 
+#[derive(Copy, Clone)]
 pub enum Channel {
-    R, G, B, A
+    R = 0,
+    G,
+    B,
+    A
 }
 
 pub enum ProcessStep {
@@ -64,10 +71,31 @@ impl Command<'_> {
 
 }
 
-pub use errors::Error;
-
 pub fn load_image<T>(source: &T) -> ImageResult where T: ImageLoader {
     source.create_image()
+}
+
+pub fn process<'a, T>(
+    out: &mut image::DynamicImage,
+    commands: &'a Vec<Command>
+) -> Result<(), errors::Error> {
+
+    let out_buffer = match out.as_mut_rgb8() {
+        Some(buffer) => buffer,
+        _ => return Err(Error::Invalid),
+    };
+    let (width, height) = out_buffer.dimensions();
+
+    for c in commands {
+        if let Some(buffer) = c.img.as_rgb8() {
+            for (i, pix) in out_buffer.pixels_mut().enumerate() {
+                let pixel_read = buffer.get_pixel((i as u32) % width, (i as u32) / height);
+                (*pix)[c.output_channel as usize] = (*pixel_read)[c.output_channel as usize];
+            }
+        }
+    };
+    out.save("./cat-output.png");
+    Ok(())
 }
 
 fn exec_internal(mut img: image::DynamicImage) -> () {
