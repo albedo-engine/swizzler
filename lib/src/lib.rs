@@ -75,7 +75,7 @@ pub fn load_image<T>(source: &T) -> ImageResult where T: ImageLoader {
     source.create_image()
 }
 
-pub fn process<'a, T>(
+pub fn process<'a>(
     out: &mut image::DynamicImage,
     commands: &'a Vec<Command>
 ) -> Result<(), errors::Error> {
@@ -88,35 +88,16 @@ pub fn process<'a, T>(
 
     for c in commands {
         if let Some(buffer) = c.img.as_rgb8() {
+            println!("{}", out_buffer.pixels_mut().len());
             for (i, pix) in out_buffer.pixels_mut().enumerate() {
-                let pixel_read = buffer.get_pixel((i as u32) % width, (i as u32) / height);
+                let p = i as u32;
+                let x = p % width as u32;
+                let y = p / width as u32;
+                let pixel_read = buffer.get_pixel(x, y);
                 (*pix)[c.output_channel as usize] = (*pixel_read)[c.output_channel as usize];
+                // *pix = *pixel_read;
             }
         }
     };
-    out.save("./cat-output.png");
     Ok(())
-}
-
-fn exec_internal(mut img: image::DynamicImage) -> () {
-    // The dimensions method returns the images width and height.
-    // println!("dimensions {:?}", img.dimensions());
-
-    if let Some(buffer) = img.as_mut_rgb8() {
-        for (i, pix) in buffer.pixels_mut().enumerate() {
-            (*pix)[0] = 255 - (*pix)[0];
-            (*pix)[1] = 255 - (*pix)[1];
-            (*pix)[2] = 255 - (*pix)[2];
-        }
-        img.save("./cat-output.png");
-    }
-}
-
-pub fn exec() -> Result<(), image::ImageError> {
-
-    match image::open("./cat.png") {
-        Ok(x) => Ok(exec_internal(x)),
-        Err(e) => Err(e)
-    }
-
 }
