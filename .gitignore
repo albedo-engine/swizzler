@@ -2,4 +2,5 @@
 cli/target
 lib/target
 **/*.rs.bk
+**/*.DS_Store
 /out

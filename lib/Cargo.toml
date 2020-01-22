@@ -13,7 +13,5 @@ homepage = "https://github.com/albedo-engine/albedo-channel-packer"
 categories = ["multimedia::images"]
 keywords = ["texture", "synthesis", "procedural"]
 
-[dependencies.image]
-version = "0.22.3"
-default-features = false
-features = [ "jpeg", "png_codec" ]
+[dependencies]
+image = "0.22.4"

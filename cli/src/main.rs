@@ -1,42 +1,20 @@
 use std::path::PathBuf;
 use std::process;
 use std::collections::HashMap;
-use std::str::FromStr;
 use structopt::StructOpt;
-use image;
-use image::GenericImageView;
+use std::str::FromStr;
 
-use texture_packer;
 use texture_packer::{
-    Command,
-    Channel,
-    Error
+    errors::ErrorKind,
+    Swizzle,
+    ChannelDescriptor
 };
 
-struct InputImage {
-    channel: Channel,
-    img_path: String,
-}
-
-impl FromStr for InputImage {
-
-    type Err = &'static str;
-
-    fn from_str(input: &str) -> Result<InputImage, Self::Err> {
-        let mut split = input.split(':');
-        let img_path = String::from(split.next().ok_or("error")?);
-        let last = split.next().ok_or("error")?;
-        let channel = match &last.to_lowercase()[..] {
-            "r" => Ok(Channel::R),
-            "g" => Ok(Channel::G),
-            "b" => Ok(Channel::B),
-            "a" => Ok(Channel::A),
-            _ => Err("failed")
-        }.unwrap();
-        Ok(InputImage { channel, img_path })
-    }
-
-}
+use image::{
+    DynamicImage,
+    RgbaImage,
+    open
+};
 
 #[derive(StructOpt)]
 #[structopt(
@@ -45,55 +23,61 @@ impl FromStr for InputImage {
     rename_all = "kebab-case"
 )]
 struct Opt {
-    #[structopt(long = "input", short)]
+    /*#[structopt(long = "input", short)]
     input: Vec<String>,
 
     #[structopt(long = "output", short, parse(from_os_str))]
-    output: PathBuf,
+    output: PathBuf,*/
 }
 
-fn process(
-    out_img: &mut image::DynamicImage,
-    out_name: &PathBuf,
-    cmds: &Vec<Command>
-) -> Result<(), texture_packer::Error> {
-    texture_packer::process(out_img, &cmds)?;
-    out_img.save(out_name)?;
-    Ok(())
+struct ImagesPool {
+
+    images: HashMap<String, DynamicImage>
+
 }
 
-fn create_image_map(input: &Vec<InputImage>) ->
-    Result<HashMap<String, image::DynamicImage>, texture_packer::Error> {
-    let mut imgs_map: HashMap<String, image::DynamicImage> = HashMap::new();
-    imgs_map.reserve(input.len());
-    for c in input {
-        if !imgs_map.contains_key(&c.img_path) {
-            let img = texture_packer::load_image(&String::from("./cat.png"))?;
-            imgs_map.insert(c.img_path.clone(), img);
+impl ImagesPool {
+
+    fn new() -> ImagesPool {
+        ImagesPool {
+            images: HashMap::new()
         }
     }
-    Ok(imgs_map)
-}
 
-fn build_commands<'a>(
-    input: &Vec<InputImage>,
-    images_map: &'a HashMap<String, image::DynamicImage>
-) -> Vec<Command<'a>> {
-    let mut cmds: Vec<Command> = Vec::new();
-    cmds.reserve(input.len());
-
-    for i in input {
-        let image = images_map.get(&i.img_path).unwrap();
-        cmds.push(Command::new(image, i.channel, i.channel, None));
+    fn load<P>(&mut self, path: P)
+        -> Result<(), ErrorKind> where P: AsRef<str> {
+        let p = path.as_ref();
+        if !self.images.contains_key(p) {
+            let img = open(path.as_ref())?;
+            self.images.insert(String::from(p), img);
+        }
+        Ok(())
     }
 
-    cmds
+    fn get<P>(&self, path: P) -> Option<&DynamicImage> where P: AsRef<str> {
+        self.images.get(path.as_ref())
+    }
+
 }
 
-fn main() {
+fn main() -> Result<(), ErrorKind> {
     let args = Opt::from_args();
 
-    let input_imgs: Result<Vec<_>, &'static str> = args.input
+    let mut img_pool = ImagesPool::new();
+    img_pool.load("./cat.png")?;
+
+    let result = RgbaImage::swizzle([
+        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 2)),
+        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 1)),
+        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 0)),
+        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 0))
+    ]).unwrap();
+
+    result.save("./output.png")?;
+
+    Ok(())
+
+    /* let input_imgs: Result<Vec<_>, &'static str> = args.input
         .iter()
         .map(|s| InputImage::from_str(s))
         .collect();
@@ -103,22 +87,11 @@ fn main() {
         process::exit(1);
     });
 
-    let images_map = create_image_map(&input_imgs).unwrap_or_else(|e| {
-        println!("Problem loading an image");
-        process::exit(1);
-    });
-
-    let ( width, height ) = images_map.values().next().unwrap().dimensions();
-
-    let mut result_img = image::DynamicImage::new_rgb8(width, height);
-    let cmds: Vec<Command> = build_commands(&input_imgs, &images_map);
-
-    if let Err(e) = process(&mut result_img, &args.output, &cmds) {
-        if atty::is(atty::Stream::Stderr) {
-            eprintln!("\x1b[31merror\x1b[0m: {}", e);
-        } else {
-            eprintln!("error: {}", e);
-        }
-        std::process::exit(1);
+    let mut session = Session::new();
+    for input in input_imgs {
+        session.add_input(input)?;
     }
+    let img = session.run((1200, 600))?;
+    img.save("./output.png").unwrap(); */
+
 }
