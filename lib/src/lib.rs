@@ -12,7 +12,9 @@ pub mod errors;
 mod swizzler;
 pub use swizzler::{
     ChannelDescriptor,
-    Swizzle
+    Swizzle,
+    swizzle_rgb,
+    swizzle_rgba,
 };
 
 /* trait Swizzle {

@@ -14,4 +14,5 @@ categories = ["multimedia::images"]
 keywords = ["texture", "synthesis", "procedural"]
 
 [dependencies]
+paste = "0.1"
 image = "0.22.4"

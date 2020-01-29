@@ -7,7 +7,8 @@ use std::str::FromStr;
 use texture_packer::{
     errors::ErrorKind,
     Swizzle,
-    ChannelDescriptor
+    ChannelDescriptor,
+    swizzle_rgba
 };
 
 use image::{
@@ -66,14 +67,14 @@ fn main() -> Result<(), ErrorKind> {
     let mut img_pool = ImagesPool::new();
     img_pool.load("./cat.png")?;
 
-    let result = RgbaImage::swizzle([
-        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 2)),
-        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 1)),
+    let result = swizzle_rgba(
         Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 0)),
-        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 0))
-    ]).unwrap();
+        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 1)),
+        Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 2)),
+        None
+    );
 
-    result.save("./output.png")?;
+    result.unwrap().save("./output.png")?;
 
     Ok(())
 
