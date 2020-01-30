@@ -1,5 +1,5 @@
 [package]
-name = "texture-packer"
+name = "swizzler"
 description = ""
 repository = "https://github.com/albedo-engine/albedo-channel-packer"
 version = "0.1.0"

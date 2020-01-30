@@ -1,5 +1,5 @@
 [package]
-name = "texture-packer-cli"
+name = "swizzler-cli"
 description = "A CLI"
 repository = ""
 version = "0.1.0"
@@ -14,12 +14,12 @@ categories = ["multimedia::images"]
 keywords = ["texture", "packing", "rendering", "cli"]
 
 [[bin]]
-name = "texture-packer"
+name = "swizzler"
 path = "src/main.rs"
 bench = false
 
 [dependencies]
-texture-packer = { version = "0.1.0", path = "../lib" }
+swizzler = { version = "0.1.0", path = "../lib" }
 structopt = "0.3.4"
 atty = "0.2.13"
 image = "0.22.4"

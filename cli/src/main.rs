@@ -1,14 +1,10 @@
-use std::path::PathBuf;
-use std::process;
 use std::collections::HashMap;
 use structopt::StructOpt;
-use std::str::FromStr;
 
-use texture_packer::{
+use swizzler::{
     errors::ErrorKind,
-    Swizzle,
     ChannelDescriptor,
-    swizzle_rgba
+    to_rgba
 };
 
 use image::{
@@ -67,7 +63,7 @@ fn main() -> Result<(), ErrorKind> {
     let mut img_pool = ImagesPool::new();
     img_pool.load("./cat.png")?;
 
-    let result = swizzle_rgba(
+    let result = to_rgba(
         Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 0)),
         Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 1)),
         Some(ChannelDescriptor::new(img_pool.get("./cat.png").unwrap(), 2)),

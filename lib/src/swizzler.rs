@@ -1,10 +1,10 @@
 use std::ops::{Index, IndexMut};
 
 use image::{
-    DynamicImage,
-    RgbaImage,
-    Rgba,
-    GenericImageView
+    Luma,
+    LumaA,
+    Rgb,
+    Rgba
 };
 use crate::errors::{
     ErrorKind
@@ -14,7 +14,18 @@ type SwizzleResult<T> = Result<T, ErrorKind>;
 
 pub struct ChannelDescriptor<'a> {
     pub channel: u8,
-    pub img: &'a DynamicImage,
+    pub img: &'a image::DynamicImage,
+}
+
+impl<'a> ChannelDescriptor<'a> {
+
+    pub fn new(
+        img: &'a image::DynamicImage,
+        channel: u8
+    ) -> ChannelDescriptor {
+        ChannelDescriptor { img, channel }
+    }
+
 }
 
 pub struct FlatSamplesDescriptor<'a> {
@@ -41,92 +52,42 @@ impl<'a> From<ChannelDescriptor<'a>> for FlatSamplesDescriptor<'a> {
 
 }
 
-impl<'a> ChannelDescriptor<'a> {
-
-    pub fn new(
-        img: &'a DynamicImage,
-        channel: u8
-    ) -> ChannelDescriptor {
-        ChannelDescriptor { img, channel }
-    }
-
-}
-
-pub trait Swizzle<'a, T> {
-
-    fn swizzle(channels: &T) -> Result<DynamicImage, ErrorKind>;
-
-}
-
-fn retrieve_dimensions<'a>(samples: &[ Option<FlatSamplesDescriptor<'a>> ]) -> Result<(u32, u32), ErrorKind>
-{
-    let mut dimensions: Option<(u32, u32)> = None;
-
-    let array = samples.as_ref();
-    for optional in array {
-        if let Some(sample) = optional {
-            let img_dim = (sample.flat_samples.layout.width, sample.flat_samples.layout.height);
-            dimensions.get_or_insert(img_dim);
-            if img_dim != dimensions.unwrap() {
-                return Err(ErrorKind::InvalidSize);
-            }
-        }
-    }
-
-    dimensions.ok_or(ErrorKind::InvalidSize)
-}
-
-fn swizzle_generic<'a, Pixel>(
-    samples: &[ Option<FlatSamplesDescriptor<'a>> ]
-) -> SwizzleResult<image::ImageBuffer<Pixel, Vec<Pixel::Subpixel>>>
-where
-    Pixel: 'static + image::Pixel<Subpixel = u8> + Sized + Index<usize>
-{
-    let dimensions = retrieve_dimensions(samples)?;
-    let mut image: image::ImageBuffer<Pixel, Vec<Pixel::Subpixel>> = image::ImageBuffer::new(
-        dimensions.0,
-        dimensions.1
-    );
-    let pixels = image.enumerate_pixels_mut();
-
-    let nb_samples = samples.len();
-
-    for (x, y, pixel) in pixels {
-        let channels = pixel.channels_mut();
-        for i in 0..nb_samples {
-            if let Some(sample) = &samples[i] {
-                channels[i] = *sample.get_sample(x, y).unwrap();
-            }
-        }
-    }
-
-    Ok(image)
-}
-
-macro_rules! test_macro {
+macro_rules! swizzle {
     ( $p:expr, $( $x:ident ),* ) => {
         {
-            let samples = [
-                $(
-                    $x.map(|channel| FlatSamplesDescriptor::from(channel)),
-                )*
-            ];
+            let mut dimensions: Option<(u32, u32)> = None;
+            $(
+                let $x = $x.map(|channel| FlatSamplesDescriptor::from(channel));
 
-            let dimensions = retrieve_dimensions(&samples)?;
+                if let Some(sample) = &$x {
+                    let img_dim = (
+                        sample.flat_samples.layout.width,
+                        sample.flat_samples.layout.height
+                    );
+                    dimensions.get_or_insert(img_dim);
+                    if img_dim != dimensions.unwrap() {
+                        return Err(ErrorKind::InvalidSize);
+                    }
+                }
+            )*
+
+            let dimensions = dimensions.ok_or(ErrorKind::InvalidSize)?;
             let mut image = image::ImageBuffer::from_pixel(
                 dimensions.0,
                 dimensions.1,
                 $p
             );
+            let mut i = 0;
             let pixels = image.enumerate_pixels_mut();
-            let nb_samples = samples.len();
 
             for (x, y, pixel) in pixels {
-                for i in 0..nb_samples {
-                    if let Some(sample) = &samples[i] {
+                $(
+                    if let Some(sample) = &$x {
                         pixel[i] = *sample.get_sample(x, y).unwrap();
                     }
-                }
+                    i += 1;
+                )*
+                i = 0;
             }
 
             Ok(image)
@@ -134,23 +95,36 @@ macro_rules! test_macro {
     };
 }
 
-pub fn swizzle_rgb(
+pub fn to_luma(
+    r: Option<ChannelDescriptor>
+) -> SwizzleResult<image::GrayImage> {
+    static DEFAULT: Luma<u8> = Luma([ 0 ]);
+    swizzle!(DEFAULT, r)
+}
+
+pub fn to_lumaA(
+    r: Option<ChannelDescriptor>,
+    a: Option<ChannelDescriptor>
+) -> SwizzleResult<image::GrayAlphaImage> {
+    static DEFAULT: LumaA<u8> = LumaA([ 0, 255 ]);
+    swizzle!(DEFAULT, r, a)
+}
+
+pub fn to_rgb(
     r: Option<ChannelDescriptor>,
     g: Option<ChannelDescriptor>,
     b: Option<ChannelDescriptor>
 ) -> SwizzleResult<image::RgbImage> {
-    swizzle_generic(&[
-        r.map(|channel| FlatSamplesDescriptor::from(channel)),
-        g.map(|channel| FlatSamplesDescriptor::from(channel)),
-        b.map(|channel| FlatSamplesDescriptor::from(channel))
-    ])
+    static DEFAULT: Rgb<u8> = Rgb([ 0, 0, 0 ]);
+    swizzle!(DEFAULT, r, g, b)
 }
 
-pub fn swizzle_rgba(
+pub fn to_rgba(
     r: Option<ChannelDescriptor>,
     g: Option<ChannelDescriptor>,
     b: Option<ChannelDescriptor>,
     a: Option<ChannelDescriptor>,
 ) -> SwizzleResult<image::RgbaImage> {
-    test_macro!(Rgba([ 0, 0, 0, 255 ]), r, g, b, a)
+    static DEFAULT: Rgba<u8> = Rgba([ 0, 0, 0, 255 ]);
+    swizzle!(DEFAULT, r, g, b, a)
 }
