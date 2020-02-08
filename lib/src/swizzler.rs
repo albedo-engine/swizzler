@@ -10,44 +10,78 @@ use crate::errors::{
     ErrorKind
 };
 
+use paste;
+
 type SwizzleResult<T> = Result<T, ErrorKind>;
+type ChannelDescResult = Result<ChannelDescriptor, ErrorKind>;
 
-pub struct ChannelDescriptor<'a> {
+pub struct ChannelDescriptor {
     pub channel: u8,
-    pub img: &'a image::DynamicImage,
+    pub img: std::rc::Rc<image::DynamicImage>,
 }
 
-impl<'a> ChannelDescriptor<'a> {
-
-    pub fn new(
-        img: &'a image::DynamicImage,
-        channel: u8
-    ) -> ChannelDescriptor {
-        ChannelDescriptor { img, channel }
-    }
-
-}
-
-pub struct FlatSamplesDescriptor<'a> {
-    channel: u8,
-    flat_samples: image::FlatSamples<&'a [ u8 ]>
-}
-
-impl FlatSamplesDescriptor<'_> {
-
-    fn get_sample(&self, x: u32, y: u32) -> Option<&u8> {
-        self.flat_samples.get_sample(self.channel, x, y)
-    }
-
-}
-
-impl<'a> From<ChannelDescriptor<'a>> for FlatSamplesDescriptor<'a> {
-
-    fn from(e: ChannelDescriptor<'a>) -> FlatSamplesDescriptor<'a> {
-        FlatSamplesDescriptor {
-            channel: e.channel,
-            flat_samples: e.img.as_flat_samples()
+impl Clone for ChannelDescriptor {
+    fn clone(&self) -> Self {
+        ChannelDescriptor {
+            channel: self.channel,
+            img: self.img.clone(),
         }
+    }
+}
+
+impl ChannelDescriptor {
+
+    pub fn from_image_rc(
+        img_input: &std::rc::Rc<image::DynamicImage>,
+        channel: u8
+    ) -> ChannelDescResult
+    {
+        let img = std::rc::Rc::clone(img_input);
+        Ok(ChannelDescriptor {
+            img: img,
+            channel
+        })
+    }
+
+    pub fn from_image(
+        img_input: image::DynamicImage,
+        channel: u8
+    ) -> ChannelDescResult {
+        let img = std::rc::Rc::new(img_input);
+        Ok(ChannelDescriptor {
+            img,
+            channel
+        })
+    }
+
+    pub fn from_path<T>(input: T) -> ChannelDescResult
+    where
+        T: AsRef<str>
+    {
+        let mut split = input.as_ref().split(':');
+
+        let img_path = String::from(
+            split.next().ok_or(
+                ErrorKind::InvalidDescriptorString(
+                    String::from(input.as_ref())
+                )
+            )?
+        );
+
+        let last = split.next().ok_or(
+            ErrorKind::InvalidDescriptorString(
+                String::from(input.as_ref())
+            )
+        )?;
+
+        let channel = (last.parse::<u8>().map_err(|e| -> ErrorKind {
+            ErrorKind::InvalidDescriptorString(
+                String::from("failed to parse channel")
+            )
+        }))?;
+        let img = image::open(&img_path)?;
+
+        ChannelDescriptor::from_image(img, channel)
     }
 
 }
@@ -55,76 +89,109 @@ impl<'a> From<ChannelDescriptor<'a>> for FlatSamplesDescriptor<'a> {
 macro_rules! swizzle {
     ( $p:expr, $( $x:ident ),* ) => {
         {
-            let mut dimensions: Option<(u32, u32)> = None;
-            $(
-                let $x = $x.map(|channel| FlatSamplesDescriptor::from(channel));
+            paste::expr! {
+                let mut dimensions: Option<(u32, u32)> = None;
 
-                if let Some(sample) = &$x {
-                    let img_dim = (
-                        sample.flat_samples.layout.width,
-                        sample.flat_samples.layout.height
-                    );
-                    dimensions.get_or_insert(img_dim);
-                    if img_dim != dimensions.unwrap() {
-                        return Err(ErrorKind::InvalidSize);
-                    }
-                }
-            )*
-
-            let dimensions = dimensions.ok_or(ErrorKind::InvalidSize)?;
-            let mut image = image::ImageBuffer::from_pixel(
-                dimensions.0,
-                dimensions.1,
-                $p
-            );
-            let mut i = 0;
-            let pixels = image.enumerate_pixels_mut();
-
-            for (x, y, pixel) in pixels {
                 $(
-                    if let Some(sample) = &$x {
-                        pixel[i] = *sample.get_sample(x, y).unwrap();
-                    }
-                    i += 1;
-                )*
-                i = 0;
-            }
+                    let [<flat_ $x>] = match $x {
+                        Some(desc) => Some(desc.img.as_ref().as_flat_samples()),
+                        None => None
+                    };
 
-            Ok(image)
+                    let [<$x _channel>]: u8 = 0;
+
+                    if let Some(sample) = &[<flat_ $x>] {
+                        let img_dim = (
+                            sample.layout.width,
+                            sample.layout.height
+                        );
+                        dimensions.get_or_insert(img_dim);
+                        if img_dim != dimensions.unwrap() {
+                            return Err(ErrorKind::InvalidSize);
+                        }
+                    }
+                )*
+
+                let dimensions = dimensions.ok_or(ErrorKind::InvalidSize)?;
+                let mut image = image::ImageBuffer::from_pixel(
+                    dimensions.0,
+                    dimensions.1,
+                    $p
+                );
+
+                // TODO: change `i` to recursive macro computing index.
+                let mut i = 0;
+                let pixels = image.enumerate_pixels_mut();
+
+                for (x, y, pixel) in pixels {
+                    $(
+                        if let Some(sample) = &[<flat_ $x>] {
+                            pixel[i] = *sample.get_sample(
+                                [<$x _channel>], x, y
+                            ).unwrap();
+                        }
+                        i += 1;
+                    )*
+                    i = 0;
+                }
+
+                Ok(image)
+            }
         }
     };
 }
 
 pub fn to_luma(
-    r: Option<ChannelDescriptor>
+    r: &Option<ChannelDescriptor>
 ) -> SwizzleResult<image::GrayImage> {
     static DEFAULT: Luma<u8> = Luma([ 0 ]);
     swizzle!(DEFAULT, r)
 }
 
 pub fn to_lumaA(
-    r: Option<ChannelDescriptor>,
-    a: Option<ChannelDescriptor>
+    r: &Option<ChannelDescriptor>,
+    a: &Option<ChannelDescriptor>
 ) -> SwizzleResult<image::GrayAlphaImage> {
     static DEFAULT: LumaA<u8> = LumaA([ 0, 255 ]);
     swizzle!(DEFAULT, r, a)
 }
 
 pub fn to_rgb(
-    r: Option<ChannelDescriptor>,
-    g: Option<ChannelDescriptor>,
-    b: Option<ChannelDescriptor>
+    r: &Option<ChannelDescriptor>,
+    g: &Option<ChannelDescriptor>,
+    b: &Option<ChannelDescriptor>
 ) -> SwizzleResult<image::RgbImage> {
     static DEFAULT: Rgb<u8> = Rgb([ 0, 0, 0 ]);
     swizzle!(DEFAULT, r, g, b)
 }
 
 pub fn to_rgba(
-    r: Option<ChannelDescriptor>,
-    g: Option<ChannelDescriptor>,
-    b: Option<ChannelDescriptor>,
-    a: Option<ChannelDescriptor>,
+    r: &Option<ChannelDescriptor>,
+    g: &Option<ChannelDescriptor>,
+    b: &Option<ChannelDescriptor>,
+    a: &Option<ChannelDescriptor>,
 ) -> SwizzleResult<image::RgbaImage> {
     static DEFAULT: Rgba<u8> = Rgba([ 0, 0, 0, 255 ]);
     swizzle!(DEFAULT, r, g, b, a)
+}
+
+pub fn to_dynamic(
+    descriptors: &Vec<Option<ChannelDescriptor>>
+) -> SwizzleResult<image::DynamicImage> {
+    let dynimg = match descriptors.len() {
+        1 => image::DynamicImage::ImageLuma8(
+            to_luma(&descriptors[0])?
+        ),
+        2 => image::DynamicImage::ImageLumaA8(
+            to_lumaA(&descriptors[0], &descriptors[1])?
+        ),
+        3 => image::DynamicImage::ImageRgb8(
+            to_rgb(&descriptors[0], &descriptors[1], &descriptors[2])?
+        ),
+        a if a >= 4 => image::DynamicImage::ImageRgba8(
+            to_rgba(&descriptors[0], &descriptors[1], &descriptors[2], &descriptors[3])?
+        ),
+        _ => panic!("too big vector!")
+    };
+    Ok(dynimg)
 }

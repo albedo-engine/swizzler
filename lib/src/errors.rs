@@ -4,6 +4,8 @@ use image;
 pub enum ErrorKind {
     Image(image::ImageError),
     IOError(std::io::Error),
+    InvalidDescriptorString(String),
+    NoInputs,
     InvalidSize,
     Invalid
 }
@@ -19,8 +21,11 @@ impl std::error::Error for ErrorKind {
 
 impl std::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        // Use `self.number` to refer to each positional data point.
-        write!(f, "{}", self)
+        match &self {
+            ErrorKind::InvalidDescriptorString(s) =>
+                write!(f, "invalid descriptor string '{}'", s),
+            _ => write!(f, "{}", self)
+        }
     }
 }
 
