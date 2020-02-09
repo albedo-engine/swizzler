@@ -1,5 +1,3 @@
-use std::ops::{Index, IndexMut};
-
 use image::{
     Luma,
     LumaA,
@@ -189,7 +187,12 @@ pub fn to_dynamic(
             to_rgb(&descriptors[0], &descriptors[1], &descriptors[2])?
         ),
         a if a >= 4 => image::DynamicImage::ImageRgba8(
-            to_rgba(&descriptors[0], &descriptors[1], &descriptors[2], &descriptors[3])?
+            to_rgba(
+                &descriptors[0],
+                &descriptors[1],
+                &descriptors[2],
+                &descriptors[3]
+            )?
         ),
         _ => panic!("too big vector!")
     };
