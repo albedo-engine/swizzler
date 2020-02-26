@@ -92,6 +92,9 @@ impl SessionBuilder {
 
     pub fn run(&mut self) -> Result<(), ErrorKind> {
 
+        // TODO: clean up the function
+        // TODO: remove temporary allocations of Vec
+
         for e in &self.folders {
             let mut entries = std::fs::read_dir(e)?
                 .map(|res| res.map(|e| e.path()))
@@ -135,6 +138,8 @@ impl SessionBuilder {
             let slice_size: usize = cmds.len() / nthreads;
             println!("{}", cmds.len());
 
+            // let mut errors: Vec<ErrorKind> = Vec::new();
+
             crossbeam::scope(|scope| {
                 for i in 0..nthreads {
                     let start = i * slice_size;
@@ -147,16 +152,9 @@ impl SessionBuilder {
                     scope.spawn(move |_| {
                         println!("new thread");
                         for cmd in slice {
-                            let val: Vec<Option<ChannelDescriptor>> = cmd.desc.iter().map(
-                                |x| -> Result<Option<ChannelDescriptor>, ErrorKind>  {
-                                    match &x {
-                                        Some(val) => Ok(Some(ChannelDescriptor::from_path(val.file_path, val.channel)?)),
-                                        _ => Ok(None)
-                                    }
-                                }
-                            ).collect::<Result<Vec<Option<ChannelDescriptor>>, ErrorKind>>().unwrap();
-
-                            let img = to_dynamic(&val).unwrap();
+                            if let Err(e) = process_command(cmd) {
+                                //errors.push(e);
+                            }
                         }
                     });
                 }
@@ -194,4 +192,17 @@ impl SessionBuilder {
         self
     }
 
+}
+
+fn process_command(cmd: &Command) -> Result<(), ErrorKind> {
+    let val: Vec<Option<ChannelDescriptor>> = cmd.desc.iter().map(|x| {
+        match &x {
+            Some(val) => Ok(Some(ChannelDescriptor::from_path(val.file_path, val.channel)?)),
+            _ => Ok(None)
+        }
+    }
+    ).collect::<Result<Vec<Option<ChannelDescriptor>>, ErrorKind>>()?;
+
+    let img = to_dynamic(&val)?;
+    Ok(())
 }
