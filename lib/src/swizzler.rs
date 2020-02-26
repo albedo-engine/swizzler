@@ -52,7 +52,15 @@ impl ChannelDescriptor {
         })
     }
 
-    pub fn from_path<T>(input: T) -> ChannelDescResult
+    pub fn from_path<T>(path: T, channel: u8) -> ChannelDescResult
+    where
+        T: AsRef<std::path::Path>
+     {
+        let img = image::open(path.as_ref())?;
+        ChannelDescriptor::from_image(img, channel)
+    }
+
+    pub fn from_description<T>(input: T) -> ChannelDescResult
     where
         T: AsRef<str>
     {

@@ -68,7 +68,7 @@ fn process_manual(command: &ManualCommand) -> Result<(), ErrorKind> {
         (command.descriptors
             .iter()
             .map(|s| -> Result<Option<ChannelDescriptor>, ErrorKind> {
-                Ok(Some(ChannelDescriptor::from_path(&s)?))
+                Ok(Some(ChannelDescriptor::from_description(&s)?))
             })
             .collect::<Result<Vec<Option<ChannelDescriptor>>, ErrorKind>>()
         )?;
@@ -82,7 +82,7 @@ fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
     let mut builder =
         SessionBuilder::new()
         .add_folders(&command.folders);
-    let session = builder.build();
+    let session = builder.run();
     Ok(())
 }
 

@@ -16,3 +16,4 @@ keywords = ["texture", "synthesis", "procedural"]
 [dependencies]
 paste = "0.1"
 image = "0.22.4"
+crossbeam = "0.7"
