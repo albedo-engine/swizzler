@@ -1,5 +1,7 @@
 use image;
 
+pub type SwizzleResult<T> = Result<T, ErrorKind>;
+
 #[derive(Debug)]
 pub enum ErrorKind {
     Image(image::ImageError),

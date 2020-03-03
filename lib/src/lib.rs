@@ -14,3 +14,8 @@ mod session;
 pub use session::{
     SessionBuilder
 };
+
+mod resolver;
+pub use resolver::{
+    DefaultResolver
+};

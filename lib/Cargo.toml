@@ -17,3 +17,4 @@ keywords = ["texture", "synthesis", "procedural"]
 paste = "0.1"
 image = "0.22.4"
 crossbeam = "0.7"
+regex = "1.3.4"

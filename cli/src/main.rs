@@ -79,10 +79,9 @@ fn process_manual(command: &ManualCommand) -> Result<(), ErrorKind> {
 }
 
 fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
-    let mut builder =
-        SessionBuilder::new()
-        .add_folders(&command.folders);
-    let session = builder.run();
+    let mut builder = SessionBuilder::new().add_folders(&command.folders);
+    let session = builder.build()?;
+    session.run();
     Ok(())
 }
 

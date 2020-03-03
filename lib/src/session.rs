@@ -1,7 +1,6 @@
 use image::{
     GenericImageView
 };
-use std::thread;
 
 use crate::errors::{
     ErrorKind
@@ -12,57 +11,23 @@ use crate::swizzler::{
     to_dynamic
 };
 
-use std::collections::HashMap;
-
-pub fn unityresolve<'a>(files: &Vec<&'a std::path::PathBuf>) -> Option<Command<'a>> {
-    let mut metalness: Option<ChannelFileDesc<'a>> = None;
-    let mut roughness: Option<ChannelFileDesc<'a>> = None;
-
-    for fpath in files {
-        let str = fpath.to_str().unwrap();
-        if str.rfind("_metalness").is_some() {
-            metalness = Some(ChannelFileDesc {
-                channel: 0,
-                file_path: fpath
-            })
-        } else if str.rfind("_roughness").is_some() {
-            roughness = Some(ChannelFileDesc {
-                channel: 0,
-                file_path: fpath
-            });
-        }
-    }
-
-    if metalness.is_some() || roughness.is_some() {
-        return Some(Command {
-            name: std::path::PathBuf::from("testounet"),
-            desc: vec![
-                metalness,
-                None,
-                None,
-                roughness
-            ]
-        });
-    }
-
-    None
-
-}
-
-pub struct ChannelFileDesc<'a> {
-    channel: u8,
-    file_path: &'a std::path::PathBuf,
-}
+use crate::resolver::{
+    DefaultResolver,
+    ImageSources,
+    Swizzler,
+    Resolver
+};
 
 #[derive(Default)]
 struct Parameters {
     max_nb_threads: u8
 }
 
-#[derive(Default)]
-pub struct SessionBuilder {
+pub struct SessionBuilder<T: Resolver> {
     folders: Vec<std::path::PathBuf>,
-    params: Parameters,
+    errors: Vec<ErrorKind>,
+    resolver: Option<T>,
+    params: Parameters
 }
 
 pub struct Command<'a> {
@@ -84,104 +49,56 @@ impl<'a> Command<'a> {
 
 }
 
-impl SessionBuilder {
+impl<T: Resolver> SessionBuilder<T> {
 
     pub fn new() -> Self {
-        Self::default()
+        SessionBuilder {
+            folders: Default::default(),
+            errors: Default::default(),
+            resolver: None,
+            params: Default::default()
+        }
     }
 
-    pub fn run(&mut self) -> Result<(), ErrorKind> {
+    pub fn build<'a>(mut self) -> Result<Session<'a>, ErrorKind> {
+        self.errors.clear();
 
-        // TODO: clean up the function
-        // TODO: remove temporary allocations of Vec
+        let mut files: Vec<String> = Vec::new();
 
         for e in &self.folders {
             let mut entries = std::fs::read_dir(e)?
                 .map(|res| res.map(|e| e.path()))
                 .collect::<Result<Vec<_>, std::io::Error>>()?;
-            entries.sort_unstable();
-            println!("{:?}", entries);
-
-            let mut map: HashMap<String, Vec<&std::path::PathBuf>> = HashMap::new();
-
-            for element in &entries {
-                if let Some(filename) = element.file_name() {
-                    if let Some(name) = filename.to_str() {
-                        let idx = name.rfind("_").unwrap();
-                        let base = name.split_at(idx).0;
-                        if map.get(base).is_none() {
-                            map.insert(String::from(base), Vec::new());
-                        }
-                        map.get_mut(base).unwrap().push(element);
-                    }
-                }
-            }
-
-            let mut cmds: Vec<Command> = Vec::new();
-
-            for (name, files) in &map {
-                println!("{}", name);
-                println!("{:?}", files);
-                if let Some(v) = unityresolve(&files) {
-                    cmds.push(v);
-                }
-            }
-
-            use std::time::Instant;
-            let now = Instant::now();
-
-            const nthreads: usize = 3;
-
-            // let mut handles: Vec<std::thread::JoinHandle<()>> =
-               // Vec::with_capacity(nthreads);
-
-            let slice_size: usize = cmds.len() / nthreads;
-            println!("{}", cmds.len());
-
-            // let mut errors: Vec<ErrorKind> = Vec::new();
-
-            crossbeam::scope(|scope| {
-                for i in 0..nthreads {
-                    let start = i * slice_size;
-                    let slice = if i < nthreads - 1 {
-                        &cmds[start..(start + slice_size)]
-                    } else {
-                        &cmds[start..]
-                    };
-
-                    scope.spawn(move |_| {
-                        println!("new thread");
-                        for cmd in slice {
-                            if let Err(e) = process_command(cmd) {
-                                //errors.push(e);
-                            }
-                        }
-                    });
-                }
-            });
-
-            let elapsed = now.elapsed();
-            println!("Elapsed: {:.2}", elapsed.as_millis());
-
-            // let img = to_dynamic(&val)?;
-            // println!("{}", img.dimensions().0);
+            files.append(&mut entries);
         }
+        files.sort_unstable();
 
-        Ok(())
+        let sources = match &self.resolver {
+            Some(r) => r.resolve(&files),
+            _ => {
+                let default_resolver = DefaultResolver::new();
+                default_resolver.resolve(&files)
+            }
+        };
+
+        Ok(Session {
+            files,
+            sources
+        })
     }
 
-    pub fn add_folder<T>(mut self, folder: T) -> Self
+    pub fn add_folder<U>(mut self, folder: U) -> Self
     where
-        T: Into<std::path::PathBuf>
+        U: Into<std::path::PathBuf>
     {
         self.folders.push(folder.into());
         self
     }
 
-    pub fn add_folders<T, I>(mut self, folders: I) -> Self
+    pub fn add_folders<U, I>(mut self, folders: U) -> Self
     where
-        T: Into<std::path::PathBuf>,
-        I: IntoIterator<Item = T>
+    U: Into<std::path::PathBuf>,
+    I: IntoIterator<Item = T>
     {
         self.folders.extend(folders.into_iter().map(|e| e.into()));
         self
@@ -190,6 +107,62 @@ impl SessionBuilder {
     pub fn set_max_threads_nb(mut self, count: u8) -> Self {
         self.params.max_nb_threads = count;
         self
+    }
+
+}
+
+pub struct Session<'a> {
+
+    files: Vec<std::path::PathBuf>,
+
+    sources: ImageSources<'a>
+
+}
+
+impl<'a> Session<'a> {
+
+    pub fn run(&self, swizzler: &dyn Swizzler) -> Vec<ErrorKind> {
+        // TODO: clean up the function
+        // TODO: remove temporary allocations of Vec
+
+        let commands: Vec<(&str, u8)> = Vec::new();
+
+        for (name, files) in &self.sources {
+            if let Some(v) = swizzler.swizzle(&files) {
+                cmds.push(v);
+            }
+        }
+
+        let errors = std::sync::Mutex::new(Vec::new());
+
+        let worker_func = |cmds: &[ Command ]| {
+            for cmd in cmds {
+                if let Err(e) = process_command(cmd) {
+                    let mut data = errors.lock().unwrap();
+                    data.push(e);
+                }
+            }
+        };
+
+        const nthreads: usize = 3;
+
+        let slice_size: usize = cmds.len() / nthreads;
+        println!("{}", cmds.len());
+
+        crossbeam::scope(|scope| {
+            for i in 0..nthreads {
+                let start = i * slice_size;
+                let slice = if i < nthreads - 1 {
+                    &cmds[start..(start + slice_size)]
+                } else {
+                    &cmds[start..]
+                };
+
+                scope.spawn(move|_| (worker_func(slice)));
+            }
+        });
+
+        errors.into_inner().unwrap()
     }
 
 }
@@ -204,5 +177,5 @@ fn process_command(cmd: &Command) -> Result<(), ErrorKind> {
     ).collect::<Result<Vec<Option<ChannelDescriptor>>, ErrorKind>>()?;
 
     let img = to_dynamic(&val)?;
-    Ok(())
+    img.save("").map_err(|e| e.into())
 }
