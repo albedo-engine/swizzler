@@ -22,4 +22,5 @@ bench = false
 swizzler = { version = "0.1.0", path = "../lib" }
 structopt = "0.3.4"
 atty = "0.2.13"
+regex = "1.3.4"
 image = "0.22.4"

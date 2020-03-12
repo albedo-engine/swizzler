@@ -1,8 +1,13 @@
 use structopt::StructOpt;
+use regex::Regex;
 
 use swizzler::{
     errors::ErrorKind,
     ChannelDescriptor,
+    GenericAssetReader,
+    GenericTarget,
+    GenericWriter,
+    AssetMatcher,
     SessionBuilder,
     to_rgba,
     to_rgb,
@@ -80,8 +85,25 @@ fn process_manual(command: &ManualCommand) -> Result<(), ErrorKind> {
 
 fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
     let mut builder = SessionBuilder::new().add_folders(&command.folders);
-    let session = builder.build()?;
-    session.run();
+    let generic_reader = GenericAssetReader::new(
+        Regex::new(r"(.*)_.*").unwrap(),
+        vec![
+            AssetMatcher::new("metalness", Regex::new(r"(?i)metal(ness)?").unwrap()),
+            AssetMatcher::new("roughness", Regex::new(r"(?i)rough(ness)?").unwrap())
+        ]
+    );
+
+    let generic_writer = GenericWriter::new(vec![
+        GenericTarget::new(vec! [
+            Some((String::from("metalness"), 0)),
+            None,
+            None,
+            Some((String::from("roughness"), 0))
+        ])
+    ]);
+
+    let session = builder.build(&generic_reader)?;
+    session.run(&generic_writer);
     Ok(())
 }
 

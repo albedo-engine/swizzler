@@ -1,4 +1,5 @@
 use image::{
+    DynamicImage,
     Luma,
     LumaA,
     Rgb,
@@ -11,6 +12,7 @@ use crate::errors::{
 use paste;
 
 type SwizzleResult<T> = Result<T, ErrorKind>;
+type SwizzleResultDyn = Result<DynamicImage, ErrorKind>;
 type ChannelDescResult = Result<ChannelDescriptor, ErrorKind>;
 
 pub struct ChannelDescriptor {
@@ -179,6 +181,15 @@ pub fn to_rgba(
 ) -> SwizzleResult<image::RgbaImage> {
     static DEFAULT: Rgba<u8> = Rgba([ 0, 0, 0, 255 ]);
     swizzle!(DEFAULT, r, g, b, a)
+}
+
+pub fn to_rgba_dyn(
+    r: &Option<ChannelDescriptor>,
+    g: &Option<ChannelDescriptor>,
+    b: &Option<ChannelDescriptor>,
+    a: &Option<ChannelDescriptor>,
+) -> SwizzleResultDyn {
+    Ok(DynamicImage::ImageRgba8(to_rgba(r, g, b, a)?))
 }
 
 pub fn to_dynamic(

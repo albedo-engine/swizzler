@@ -15,7 +15,13 @@ pub use session::{
     SessionBuilder
 };
 
-mod resolver;
-pub use resolver::{
-    DefaultResolver
+mod asset;
+pub use asset::{
+    AssetMatcher,
+    AssetReader,
+    GenericAsset,
+    GenericAssetReader,
+    GenericWriter,
+    GenericTarget,
+    Target
 };

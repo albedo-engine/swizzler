@@ -14,6 +14,7 @@ categories = ["multimedia::images"]
 keywords = ["texture", "synthesis", "procedural"]
 
 [dependencies]
+num_cpus = "1.12.0"
 paste = "0.1"
 image = "0.22.4"
 crossbeam = "0.7"
