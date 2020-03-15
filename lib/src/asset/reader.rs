@@ -47,10 +47,14 @@ impl<'a> GenericAsset<'a> {
         GenericAsset { base, ..Default::default() }
     }
 
+    pub fn get_base(&self) -> &str {
+        &self.base
+    }
+
     pub fn get_texture_path(&self, id: &str) -> Option<&PathBuf> {
         match self.textures.get(id) {
             Some(path) => Some(path),
-            _=> None
+            _ => None
         }
     }
 

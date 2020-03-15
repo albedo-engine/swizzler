@@ -46,6 +46,14 @@ struct SessionCommand {
     #[structopt(long = "folder", short, parse(from_os_str))]
     folders: Vec<std::path::PathBuf>,
 
+    #[structopt(
+        long = "output",
+        short,
+        parse(from_os_str),
+        default_value = "./__swizzler_build"
+    )]
+    output: std::path::PathBuf
+
 }
 
 #[derive(StructOpt)]
@@ -103,7 +111,8 @@ fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
     ]);
 
     let session = builder.build(&generic_reader)?;
-    session.run(&generic_writer);
+    session.set_output_folder(command.output.to_path_buf())
+        .run(&generic_writer);
     Ok(())
 }
 

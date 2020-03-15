@@ -3,7 +3,8 @@ use image::{
 };
 
 use crate::asset::{
-    AssetReader, GenericWriter, GenericAssetReader, GenericAsset, Target
+    AssetReader, GenericWriter, GenericAssetReader, GenericAsset,
+    GenericTarget, Target
 };
 
 use crate::errors::{
@@ -54,7 +55,7 @@ impl SessionBuilder {
             assets.append(&mut resolver.resolve(&entries));
         }
 
-        Ok(Session { assets, parameters: self.params })
+        Ok(Session::new(assets, self.params))
     }
 
     pub fn add_folder<U>(mut self, folder: U) -> Self
@@ -85,29 +86,50 @@ pub struct Session<'a> {
 
     assets: Vec<GenericAsset<'a>>,
 
+    output_folder: std::path::PathBuf,
+
     parameters: Parameters
 
 }
 
 impl<'a> Session<'a> {
 
+    fn new(assets: Vec<GenericAsset<'a>>, parameters: Parameters) -> Session {
+        Session {
+            assets,
+            parameters,
+            output_folder: std::path::PathBuf::from("./__swizzler_build")
+        }
+    }
+
+    pub fn set_output_folder(mut self, folder: std::path::PathBuf) -> Self {
+        self.output_folder = folder;
+        self
+    }
+
     pub fn run(&self, swizzler: &GenericWriter) -> Vec<ErrorKind> {
         // TODO: clean up the function
         // TODO: remove temporary allocations of Vec
 
+        let output_folder = &self.output_folder;
+
         let errors = std::sync::Mutex::new(Vec::new());
+
+        let write_func = |target: &GenericTarget, asset: &GenericAsset| ->
+            Result<(), ErrorKind> {
+            let img = target.generate(asset)?;
+            let mut p = output_folder.to_path_buf();
+            p.push(target.get_filename(asset));
+            img.save_with_format(&p, target.output_format)?;
+            Ok(())
+        };
 
         let worker_func = |assets: &[ GenericAsset ]| {
             for asset in assets {
                 for target in &swizzler.targets {
-                    match target.generate(&asset) {
-                        Ok(img) => {
-                            println!("{}, {}", img.dimensions().0, img.dimensions().1);
-                        },
-                        Err(e) => {
-                            let mut data = errors.lock().unwrap();
-                            data.push(e);
-                        }
+                    if let Err(e) = write_func(target, asset) {
+                        let mut data = errors.lock().unwrap();
+                        data.push(e);
                     }
                 }
             }
@@ -117,9 +139,6 @@ impl<'a> Session<'a> {
             self.assets.len() / 2,
             self.parameters.max_nb_threads
         );
-
-        println!("max thread {}", self.parameters.max_nb_threads);
-        println!("nb thread {}", nthreads);
 
         let slice_size: usize = self.assets.len() / nthreads;
 
