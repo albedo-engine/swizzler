@@ -12,7 +12,7 @@ pub use swizzler::{
 
 mod session;
 pub use session::{
-    SessionBuilder
+    Session
 };
 
 mod asset;

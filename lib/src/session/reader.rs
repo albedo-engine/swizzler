@@ -2,7 +2,7 @@ use std::collections::{
     HashMap
 };
 use std::path::{
-    PathBuf
+    PathBuf, Path
 };
 use regex;
 
@@ -35,7 +35,10 @@ pub trait AssetReader<'a> {
 
 }
 
-#[derive(Default)]
+/// A structure containing all texture paths related to a unique asset, such as
+/// metalness, roughness, ao, etc...
+///
+/// An asset is generally not used by itself, but through an AssetReader.
 pub struct GenericAsset<'a> {
     base: String,
     textures: HashMap<&'a str, PathBuf>
@@ -44,7 +47,14 @@ pub struct GenericAsset<'a> {
 impl<'a> GenericAsset<'a> {
 
     fn new(base: String) -> GenericAsset<'a> {
-        GenericAsset { base, ..Default::default() }
+        GenericAsset {
+            base,
+            textures: HashMap::new()
+        }
+    }
+
+    pub fn empty(&self) -> bool {
+        self.textures.len() == 0
     }
 
     pub fn get_base(&self) -> &str {
@@ -55,6 +65,13 @@ impl<'a> GenericAsset<'a> {
         match self.textures.get(id) {
             Some(path) => Some(path),
             _ => None
+        }
+    }
+
+    pub fn get_folder(&self) -> Option<&Path> {
+        match self.textures.values().next() {
+            Some(p) => p.parent(),
+            None => None
         }
     }
 
@@ -78,7 +95,7 @@ impl GenericAssetReader {
 
 }
 
-impl<'a> AssetReader<'a> for GenericAssetReader {
+impl<'a, 'b> AssetReader<'a> for GenericAssetReader {
 
     type AssetType = GenericAsset<'a>;
 
@@ -91,8 +108,6 @@ impl<'a> AssetReader<'a> for GenericAssetReader {
 
         for path in files {
             if let Some(filename) = path.file_name().and_then(|x| x.to_str()) {
-                println!("{}", filename);
-
                 let base = self.base.captures(filename).and_then(|v| v.get(1));
                 if base.is_none() { continue; }
                 let base = base.unwrap().as_str();
@@ -100,7 +115,8 @@ impl<'a> AssetReader<'a> for GenericAssetReader {
                 let idx = result.iter()
                     .position(|e| e.base == base)
                     .or_else(|| -> Option<usize> {
-                        result.push(Self::AssetType::new(String::from(base)));
+                        let asset = Self::AssetType::new(String::from(base));
+                        result.push(asset);
                         Some(result.len() - 1)
                     }).unwrap();
 
@@ -117,7 +133,6 @@ impl<'a> AssetReader<'a> for GenericAssetReader {
         }
 
         result
-
     }
 
 }

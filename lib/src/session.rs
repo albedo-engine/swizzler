@@ -1,6 +1,4 @@
-use image::{
-    GenericImageView
-};
+use std::path::{Path, PathBuf};
 
 use crate::asset::{
     AssetReader, GenericWriter, GenericAssetReader, GenericAsset,
@@ -11,7 +9,6 @@ use crate::errors::{
     ErrorKind
 };
 
-#[derive(Default)]
 struct Parameters {
     max_nb_threads: usize
 }
@@ -26,65 +23,11 @@ impl Parameters {
 
 }
 
-#[derive(Default)]
-pub struct SessionBuilder {
-    folders: Vec<std::path::PathBuf>,
-    params: Parameters
-}
-
-impl SessionBuilder {
-
-    pub fn new() -> Self {
-        SessionBuilder {
-            params: Parameters::new(),
-            ..Default::default()
-        }
-    }
-
-    pub fn build<'a>(
-        self,
-        resolver: &'a GenericAssetReader
-    ) -> Result<Session<'a>, ErrorKind> {
-        let mut assets: Vec<GenericAsset<'a>> = Vec::new();
-
-        for e in &self.folders {
-            let mut entries = std::fs::read_dir(e)?
-                .map(|res| res.map(|e| e.path()))
-                .collect::<Result<Vec<_>, std::io::Error>>()?;
-            entries.sort_unstable();
-            assets.append(&mut resolver.resolve(&entries));
-        }
-
-        Ok(Session::new(assets, self.params))
-    }
-
-    pub fn add_folder<U>(mut self, folder: U) -> Self
-    where
-        U: Into<std::path::PathBuf>
-    {
-        self.folders.push(folder.into());
-        self
-    }
-
-    pub fn add_folders<U, I>(mut self, folders: I) -> Self
-    where
-    U: Into<std::path::PathBuf>,
-    I: IntoIterator<Item = U>
-    {
-        self.folders.extend(folders.into_iter().map(|e| e.into()));
-        self
-    }
-
-    pub fn set_max_threads_nb(mut self, count: usize) -> Self {
-        self.params.max_nb_threads = count;
-        self
-    }
-
-}
-
 pub struct Session<'a> {
 
     assets: Vec<GenericAsset<'a>>,
+
+    input_folder: std::path::PathBuf,
 
     output_folder: std::path::PathBuf,
 
@@ -94,11 +37,12 @@ pub struct Session<'a> {
 
 impl<'a> Session<'a> {
 
-    fn new(assets: Vec<GenericAsset<'a>>, parameters: Parameters) -> Session {
+    pub fn new() -> Session<'a> {
         Session {
-            assets,
-            parameters,
-            output_folder: std::path::PathBuf::from("./__swizzler_build")
+            output_folder: std::path::PathBuf::from("./__swizzler_build"),
+            input_folder: std::path::PathBuf::new(),
+            parameters: Parameters::new(),
+            assets: Vec::new()
         }
     }
 
@@ -107,20 +51,31 @@ impl<'a> Session<'a> {
         self
     }
 
+    pub fn read(&mut self, resolver: &'a GenericAssetReader) -> Result<(), ErrorKind> {
+        resolve_dir(&self.input_folder, &mut self.assets, resolver)?;
+        self.assets.retain(|e| !e.empty());
+        Ok(())
+    }
+
     pub fn run(&self, swizzler: &GenericWriter) -> Vec<ErrorKind> {
         // TODO: clean up the function
         // TODO: remove temporary allocations of Vec
-
-        let output_folder = &self.output_folder;
 
         let errors = std::sync::Mutex::new(Vec::new());
 
         let write_func = |target: &GenericTarget, asset: &GenericAsset| ->
             Result<(), ErrorKind> {
             let img = target.generate(asset)?;
-            let mut p = output_folder.to_path_buf();
-            p.push(target.get_filename(asset));
-            img.save_with_format(&p, target.output_format)?;
+            let mut fullpath = self.output_folder.to_path_buf();
+            if let Some(p) = asset.get_folder() {
+                fullpath.push(p.strip_prefix(&self.input_folder).unwrap());
+            }
+            fullpath.push(target.get_filename(asset));
+
+            // Creates directory if doesn't exist.
+            std::fs::create_dir_all(fullpath.parent().unwrap())?;
+
+            img.save_with_format(&fullpath, target.output_format)?;
             Ok(())
         };
 
@@ -158,4 +113,35 @@ impl<'a> Session<'a> {
         errors.into_inner().unwrap()
     }
 
+    pub fn set_input_folder<U>(mut self, folder: U) -> Self
+    where
+        U: Into<std::path::PathBuf>
+    {
+        self.input_folder = folder.into();
+        self
+    }
+
+    pub fn set_max_threads_nb(mut self, count: usize) -> Self {
+        self.parameters.max_nb_threads = count;
+        self
+    }
+
+}
+
+// one possible implementation of walking a directory only visiting files
+fn resolve_dir<'a>(
+    dir: &Path,
+    out: &mut Vec<GenericAsset<'a>>,
+    resolver: &'a GenericAssetReader,
+) -> std::io::Result<()> {
+    let mut files = std::fs::read_dir(dir)?
+        .map(|res| res.map(|e| e.path()))
+        .collect::<Result<Vec<_>, std::io::Error>>()?;
+    for path in &files {
+        if path.is_dir() { resolve_dir(path, out, resolver)?; }
+    }
+    files.retain(|p| p.is_file());
+
+    out.append(&mut resolver.resolve(&files));
+    Ok(())
 }

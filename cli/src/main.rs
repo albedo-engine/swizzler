@@ -8,7 +8,7 @@ use swizzler::{
     GenericTarget,
     GenericWriter,
     AssetMatcher,
-    SessionBuilder,
+    Session,
     to_rgba,
     to_rgb,
     to_luma,
@@ -44,7 +44,7 @@ struct ManualCommand {
 struct SessionCommand {
 
     #[structopt(long = "folder", short, parse(from_os_str))]
-    folders: Vec<std::path::PathBuf>,
+    folder: std::path::PathBuf,
 
     #[structopt(
         long = "output",
@@ -92,7 +92,6 @@ fn process_manual(command: &ManualCommand) -> Result<(), ErrorKind> {
 }
 
 fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
-    let mut builder = SessionBuilder::new().add_folders(&command.folders);
     let generic_reader = GenericAssetReader::new(
         Regex::new(r"(.*)_.*").unwrap(),
         vec![
@@ -110,9 +109,17 @@ fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
         ])
     ]);
 
-    let session = builder.build(&generic_reader)?;
-    session.set_output_folder(command.output.to_path_buf())
-        .run(&generic_writer);
+    let mut session = Session::new()
+        .set_input_folder(command.folder.to_path_buf())
+        .set_output_folder(command.output.to_path_buf());
+    session.read(&generic_reader)?;
+
+    let errors = session.run(&generic_writer);
+
+    println!("{}", errors.len());
+    for e in &errors {
+        eprintln!("Error found: {:?}", e);
+    }
     Ok(())
 }
 
