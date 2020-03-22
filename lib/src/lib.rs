@@ -10,18 +10,4 @@ pub use swizzler::{
     to_dynamic
 };
 
-mod session;
-pub use session::{
-    Session
-};
-
-mod asset;
-pub use asset::{
-    AssetMatcher,
-    AssetReader,
-    GenericAsset,
-    GenericAssetReader,
-    GenericWriter,
-    GenericTarget,
-    Target
-};
+pub mod session;

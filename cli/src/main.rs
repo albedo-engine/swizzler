@@ -4,22 +4,18 @@ use regex::Regex;
 use swizzler::{
     errors::ErrorKind,
     ChannelDescriptor,
-    GenericAssetReader,
-    GenericTarget,
-    GenericWriter,
-    AssetMatcher,
-    Session,
     to_rgba,
     to_rgb,
     to_luma,
     to_lumaA,
     to_dynamic
 };
-
-use image::{
-    DynamicImage,
-    RgbaImage,
-    open
+use swizzler::session::{
+    GenericAssetReader,
+    GenericTarget,
+    RegexMatcher,
+    Session,
+    resolve_assets_dir
 };
 
 #[derive(StructOpt)]
@@ -76,7 +72,13 @@ struct Opt {
     cmd: Command
 }
 
+/// Executes a manual command.
+///
+/// A manual command takes up to four input images, and swizzle their channels
+/// into a new image. This allows user to swizzle anything using this CLI.
 fn process_manual(command: &ManualCommand) -> Result<(), ErrorKind> {
+    // Converts inputs into channel descriptors, that the Swizzler library
+    // can use to generate the image.
     let descriptors: Vec<Option<ChannelDescriptor>> =
         (command.descriptors
             .iter()
@@ -92,29 +94,28 @@ fn process_manual(command: &ManualCommand) -> Result<(), ErrorKind> {
 }
 
 fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
-    let generic_reader = GenericAssetReader::new(
-        Regex::new(r"(.*)_.*").unwrap(),
-        vec![
-            AssetMatcher::new("metalness", Regex::new(r"(?i)metal(ness)?").unwrap()),
-            AssetMatcher::new("roughness", Regex::new(r"(?i)rough(ness)?").unwrap())
-        ]
-    );
+    let generic_reader = GenericAssetReader::new()
+        .add_matcher(
+            Box::new(RegexMatcher::new(String::from("metalness"), Regex::new(r"(?i)metal(ness)?").unwrap()))
+        )
+        .add_matcher(
+            Box::new(RegexMatcher::new(String::from("roughness"), Regex::new(r"(?i)rough(ness)?").unwrap()))
+        );
 
-    let generic_writer = GenericWriter::new(vec![
-        GenericTarget::new(vec! [
-            Some((String::from("metalness"), 0)),
-            None,
-            None,
-            Some((String::from("roughness"), 0))
-        ])
-    ]);
+    let assets = resolve_assets_dir(command.folder.as_path(), &generic_reader)?;
 
-    let mut session = Session::new()
-        .set_input_folder(command.folder.to_path_buf())
-        .set_output_folder(command.output.to_path_buf());
-    session.read(&generic_reader)?;
+    let target = GenericTarget::new(vec! [
+        Some((String::from("metalness"), 0)),
+        None,
+        None,
+        Some((String::from("roughness"), 0))
+    ]).set_name(String::from("-metalroughness.png"));
 
-    let errors = session.run(&generic_writer);
+    let session = Session::new()
+        .set_output_folder(command.output.to_path_buf())
+        .add_target(target);
+
+    let errors = session.run(&assets);
 
     println!("{}", errors.len());
     for e in &errors {

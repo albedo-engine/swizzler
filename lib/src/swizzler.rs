@@ -156,12 +156,25 @@ pub fn to_luma(
     swizzle!(DEFAULT, r)
 }
 
+pub fn to_luma_dyn(
+    r: &Option<ChannelDescriptor>
+) -> SwizzleResultDyn {
+    Ok(DynamicImage::ImageLuma8(to_luma(r)?))
+}
+
 pub fn to_lumaA(
     r: &Option<ChannelDescriptor>,
     a: &Option<ChannelDescriptor>
 ) -> SwizzleResult<image::GrayAlphaImage> {
     static DEFAULT: LumaA<u8> = LumaA([ 0, 255 ]);
     swizzle!(DEFAULT, r, a)
+}
+
+pub fn to_lumaa_dyn(
+    r: &Option<ChannelDescriptor>,
+    g: &Option<ChannelDescriptor>
+) -> SwizzleResultDyn {
+    Ok(DynamicImage::ImageLumaA8(to_lumaA(r, g)?))
 }
 
 pub fn to_rgb(
@@ -171,6 +184,14 @@ pub fn to_rgb(
 ) -> SwizzleResult<image::RgbImage> {
     static DEFAULT: Rgb<u8> = Rgb([ 0, 0, 0 ]);
     swizzle!(DEFAULT, r, g, b)
+}
+
+pub fn to_rgb_dyn(
+    r: &Option<ChannelDescriptor>,
+    g: &Option<ChannelDescriptor>,
+    b: &Option<ChannelDescriptor>
+) -> SwizzleResultDyn {
+    Ok(DynamicImage::ImageRgb8(to_rgb(r, g, b)?))
 }
 
 pub fn to_rgba(

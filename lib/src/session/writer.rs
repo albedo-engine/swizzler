@@ -1,50 +1,78 @@
+use std::cmp::Eq;
+use std::hash::Hash;
+
 use image::{
     DynamicImage,
     ImageFormat
 };
 
 use crate::swizzler::{
+    to_luma_dyn,
+    to_lumaa_dyn,
+    to_rgb_dyn,
     to_rgba_dyn,
     ChannelDescriptor
 };
-
 use crate::errors::{
     ErrorKind
 };
-
-use crate::asset::{
+use crate::session::{
+    Asset,
     GenericAsset
 };
 
-pub trait Target {
+/// Generalized texture target.
+///
+/// Describes how to generate the final image, from a given [`Asset`].
+pub trait Target<A: Asset> {
 
-    fn generate(&self, asset: &GenericAsset) -> Result<DynamicImage, ErrorKind>;
+    type Identifier: Hash + Eq;
 
-    fn get_filename(&self, asset: &GenericAsset) -> String;
+    /// Generates the texture by swizzling channels of inputs found in the
+    /// ```asset``` container.
+    fn generate(&self, asset: &A) -> Result<DynamicImage, ErrorKind>;
+
+    /// Returns the file name the generated texture should have.
+    fn get_filename(&self, asset: &A) -> String;
+
+    fn get_format(&self) -> image::ImageFormat;
 
 }
 
-pub struct GenericTarget {
+/// Generic implementation of the [`Target`] trait.
+///
+/// This allows to create target at runtime, from the CLI, a JSON, ...
+pub struct GenericTarget<Identifier: Eq + Hash + Sync = String> {
 
+    pub name: Option<String>,
+
+    /// Format to use when encoding the texture.
     pub output_format: image::ImageFormat,
 
-    pub inputs: Vec<Option<(String, u8)>>
+    /// Swizzling inputs.
+    pub inputs: Vec<Option<(Identifier, u8)>>
 
 }
 
-impl GenericTarget {
+impl<I: Eq + Hash + Sync> GenericTarget<I> {
 
-    pub fn new(inputs: Vec<Option<(String, u8)>>) -> GenericTarget {
+    pub fn new(inputs: Vec<Option<(I, u8)>>) -> GenericTarget<I> {
         GenericTarget {
+            name: None,
             output_format: image::ImageFormat::PNG,
             inputs
         }
     }
 
+    pub fn set_name(mut self, name: String) -> Self {
+        self.name = Some(name);
+        self
+    }
+
     fn _create_descriptor(
         &self,
         index: usize,
-        asset: &GenericAsset
+        asset: &GenericAsset<I>
     ) -> Result<Option<ChannelDescriptor>, ErrorKind> {
         if let Some(input) = &self.inputs[index] {
             match asset.get_texture_path(&input.0) {
@@ -58,13 +86,28 @@ impl GenericTarget {
 
 }
 
-impl Target for GenericTarget {
+impl<'a, I: Hash + Eq + Sync + 'a> Target<GenericAsset<'a, I>> for GenericTarget<I> {
 
-    fn generate(&self, asset: &GenericAsset) -> Result<DynamicImage, ErrorKind> {
+    type Identifier = I;
+
+    fn generate(&self, asset: &GenericAsset<'a, I>) -> Result<DynamicImage, ErrorKind> {
         match self.inputs.len() {
-            1 => Err(ErrorKind::NoInputs),
-            2 => Err(ErrorKind::NoInputs),
-            3 => Err(ErrorKind::NoInputs),
+            1 => {
+                to_luma_dyn(&self._create_descriptor(0, asset)?)
+            },
+            2 => {
+                to_lumaa_dyn(
+                    &self._create_descriptor(0, asset)?,
+                    &self._create_descriptor(1, asset)?
+                )
+            },
+            3 => {
+                to_rgb_dyn(
+                    &self._create_descriptor(0, asset)?,
+                    &self._create_descriptor(1, asset)?,
+                    &self._create_descriptor(2, asset)?,
+                )
+            },
             a if a >= 4 => {
                 to_rgba_dyn(
                     &self._create_descriptor(0, asset)?,
@@ -77,48 +120,16 @@ impl Target for GenericTarget {
         }
     }
 
-    fn get_filename(&self, asset: &GenericAsset) -> String {
-        let mut result = String::from(asset.get_base());
-        result.push_str("-");
-        for input in &self.inputs {
-            if let Some(input) = input {
-                result.push_str(&input.0);
-            }
+    fn get_filename(&self, asset: &GenericAsset<'a, I>) -> String {
+        let mut filename = String::from(asset.get_base());
+        if let Some(name) = &self.name {
+            filename.push_str(name);
         }
-        result.push_str(".");
-        result.push_str(get_image_format_ext(self.output_format));
-        result
+        filename
     }
 
-}
-
-pub struct GenericWriter {
-
-    pub targets: Vec<GenericTarget>
-
-}
-
-impl GenericWriter {
-
-    pub fn new(targets: Vec<GenericTarget>) -> GenericWriter {
-        GenericWriter {
-            targets
-        }
+    fn get_format(&self) -> image::ImageFormat {
+        self.output_format
     }
 
-}
-
-fn get_image_format_ext(format: ImageFormat) -> &'static str {
-    match &format {
-        ImageFormat::PNG => "png",
-        ImageFormat::JPEG => "jpg",
-        ImageFormat::TIFF => "tif",
-        ImageFormat::TGA => "tga",
-        ImageFormat::HDR => "hdr",
-        ImageFormat::GIF => "gif",
-        ImageFormat::BMP => "bpm",
-        ImageFormat::WEBP => "webp",
-        ImageFormat::ICO => "ico",
-        ImageFormat::PNM => "pnm"
-    }
 }
