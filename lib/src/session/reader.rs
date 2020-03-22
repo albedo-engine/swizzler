@@ -142,12 +142,44 @@ impl<I: Eq + Hash> GenericAssetReader<I> {
         }
     }
 
+    /// Sets the regex used to extract the name of each asset.
+    ///
+    /// This regex is extremly important as it's the one used to group images
+    /// together under the same asset.
+    ///
+    /// # Example
+    ///
+    /// ```sh
+    /// $ ls
+    /// hero_metalness.png
+    /// hero_roughness.png
+    /// hero_ao.png
+    /// enemy_metalness.png
+    /// enemy_roughness.png
+    /// enemy_ao.png
+    /// ```
+    ///
+    /// Here we want the base name to be everything up to the last underscore,
+    /// we can then use this regexp to extract the base:
+    ///
+    /// ```rust
+    /// set_base(Regex::new(r"(.*)_.*").unwrap())
+    /// ```
     pub fn set_base(mut self, base: regex::Regex) -> Self {
         // TODO: check that base as at least one capture.
         self.base = base;
         self
     }
 
+    /// Adds a matcher to this reader.println
+    ///
+    /// All matchers will be run on all files in order to determine their type.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    ///
+    /// ```
     pub fn add_matcher(mut self, matcher: Box<dyn FileMatch<Identifier=I>>) -> Self {
         self.matchers.push(matcher);
         self
@@ -175,8 +207,6 @@ impl<'a, I: Eq + Hash + 'a> AssetReader<'a, GenericAsset<'a, I>> for GenericAsse
                 if base.is_none() { continue; }
 
                 let base = base.unwrap().as_str();
-
-                println!("{}", base);
 
                 let idx = result.iter()
                     .position(|e| e.base == base)
