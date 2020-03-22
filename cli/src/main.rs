@@ -1,19 +1,21 @@
 use structopt::StructOpt;
-use regex::Regex;
+use serde::{
+    Deserialize,
+    Deserializer,
+    de
+};
+use image::ImageFormat;
 
 use swizzler::{
     errors::ErrorKind,
     ChannelDescriptor,
-    to_rgba,
-    to_rgb,
-    to_luma,
-    to_lumaA,
     to_dynamic
 };
 use swizzler::session::{
     GenericAssetReader,
     GenericTarget,
     RegexMatcher,
+    FileMatch,
     Session,
     resolve_assets_dir
 };
@@ -72,6 +74,87 @@ struct Opt {
     cmd: Command
 }
 
+#[derive(Deserialize)]
+#[serde(remote = "RegexMatcher")]
+struct RegexMatcherDef {
+    id: String,
+    #[serde(deserialize_with = "de_regexp_from_str")]
+    matcher: regex::Regex
+}
+
+#[derive(Deserialize)]
+#[serde(remote = "GenericTarget")]
+struct GenericTargetDef {
+    name: Option<String>,
+
+    #[serde(deserialize_with = "de_image_format_from_str")]
+    output_format: image::ImageFormat,
+
+    inputs: Vec<Option<(String, u8)>>
+}
+
+#[derive(Deserialize)]
+struct Config {
+
+    #[serde(deserialize_with = "de_regexp_from_str")]
+    base: regex::Regex,
+
+    #[serde(deserialize_with = "de_vec_matcher")]
+    matchers: Vec<Box<RegexMatcher>>,
+
+    #[serde(deserialize_with = "de_vec_target")]
+    targets: Vec<GenericTarget>
+
+}
+
+fn de_regexp_from_str<'de, D>(deserializer: D) -> Result<regex::Regex, D::Error>
+    where D: Deserializer<'de>
+{
+    let s = String::deserialize(deserializer)?;
+    regex::Regex::new(&s).map_err(de::Error::custom)
+}
+
+fn de_image_format_from_str<'de, D>(deserializer: D) -> Result<image::ImageFormat, D::Error>
+    where D: Deserializer<'de>
+{
+    let s = String::deserialize(deserializer)?.to_lowercase();
+    match s.as_str() {
+        "png" => Ok(ImageFormat::PNG),
+        "jpg" => Ok(ImageFormat::JPEG),
+        "tif" => Ok(ImageFormat::TIFF),
+        "tga" => Ok(ImageFormat::TGA),
+        "hdr" => Ok(ImageFormat::HDR),
+        "gif" => Ok(ImageFormat::GIF),
+        "bpm" => Ok(ImageFormat::BMP),
+        "webp" => Ok(ImageFormat::WEBP),
+        "ico" => Ok(ImageFormat::ICO),
+        "pnm" => Ok(ImageFormat::PNM),
+        _ => Ok(ImageFormat::PNG)
+    }
+}
+
+fn de_vec_matcher<'de, D>(deserializer: D) -> Result<Vec<Box<RegexMatcher>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct Wrapper(#[serde(with = "RegexMatcherDef")] RegexMatcher);
+
+    let v = Vec::deserialize(deserializer)?;
+    Ok(v.into_iter().map(|Wrapper(a)| Box::new(a)).collect())
+}
+
+fn de_vec_target<'de, D>(deserializer: D) -> Result<Vec<GenericTarget>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    struct Wrapper(#[serde(with = "GenericTargetDef")] GenericTarget);
+
+    let v = Vec::deserialize(deserializer)?;
+    Ok(v.into_iter().map(|Wrapper(a)| a).collect())
+}
+
 /// Executes a manual command.
 ///
 /// A manual command takes up to four input images, and swizzle their channels
@@ -94,7 +177,43 @@ fn process_manual(command: &ManualCommand) -> Result<(), ErrorKind> {
 }
 
 fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
-    let generic_reader = GenericAssetReader::new()
+
+    let json = r#"{
+        "base": "(.*)_.*",
+        "matchers": [
+            { "id": "metalness", "matcher": "(?i)metal(ness)?" },
+            { "id": "roughness", "matcher": "(?i)rough(ness)?" }
+        ],
+        "targets": [
+          {
+            "name": "-metalness-roughness.png",
+            "output_format": "png",
+            "inputs": [
+                [ "metalness", 0 ],
+                null,
+                null,
+                [ "roughness", 0 ]
+            ]
+          }
+        ]
+      }"#;
+
+    let mut config: Config = serde_json::from_str(json).unwrap();
+
+    println!("{}", config.base.as_str());
+
+    let session = Session::new()
+        .set_output_folder(command.output.to_path_buf())
+        .add_targets(&mut config.targets);
+
+    let mut resolver = GenericAssetReader::new().set_base(config.base);
+    for m in config.matchers {
+        resolver = resolver.add_matcher(m);
+    }
+
+    let assets = resolve_assets_dir(&command.folder, &resolver)?;
+
+    /* let generic_reader = GenericAssetReader::new()
         .add_matcher(
             Box::new(RegexMatcher::new(String::from("metalness"), Regex::new(r"(?i)metal(ness)?").unwrap()))
         )
@@ -102,7 +221,7 @@ fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
             Box::new(RegexMatcher::new(String::from("roughness"), Regex::new(r"(?i)rough(ness)?").unwrap()))
         );
 
-    let assets = resolve_assets_dir(command.folder.as_path(), &generic_reader)?;
+    let assets = resolve_assets_dir(std::path::Path::new("./"), &generic_reader)?;
 
     let target = GenericTarget::new(vec! [
         Some((String::from("metalness"), 0)),
@@ -113,7 +232,7 @@ fn process_session(command: &SessionCommand) -> Result<(), ErrorKind> {
 
     let session = Session::new()
         .set_output_folder(command.output.to_path_buf())
-        .add_target(target);
+        .add_target(target); */
 
     let errors = session.run(&assets);
 

@@ -35,15 +35,17 @@ pub trait Target<A: Asset> {
     /// Returns the file name the generated texture should have.
     fn get_filename(&self, asset: &A) -> String;
 
+    /// Returns the encoding format this target will use when saved to disk.
     fn get_format(&self) -> image::ImageFormat;
 
 }
 
 /// Generic implementation of the [`Target`] trait.
 ///
-/// This allows to create target at runtime, from the CLI, a JSON, ...
+/// This allows to create target at runtime, from a config file for instance.
 pub struct GenericTarget<Identifier: Eq + Hash + Sync = String> {
 
+    /// Name to append when generating the filename.
     pub name: Option<String>,
 
     /// Format to use when encoding the texture.
@@ -66,6 +68,11 @@ impl<I: Eq + Hash + Sync> GenericTarget<I> {
 
     pub fn set_name(mut self, name: String) -> Self {
         self.name = Some(name);
+        self
+    }
+
+    pub fn set_output_format(mut self, format: image::ImageFormat) -> Self {
+        self.output_format = format;
         self
     }
 

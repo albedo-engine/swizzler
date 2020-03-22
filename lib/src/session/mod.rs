@@ -5,6 +5,7 @@ pub use reader::{
     AssetReader,
     GenericAsset,
     GenericAssetReader,
+    FileMatch,
     RegexMatcher,
     resolve_assets_dir
 };
@@ -118,6 +119,11 @@ impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T>
 
     pub fn add_target(mut self, target: T) -> Self {
         self.targets.push(target);
+        self
+    }
+
+    pub fn add_targets(mut self, targets: &mut Vec<T>) -> Self {
+        self.targets.append(targets);
         self
     }
 

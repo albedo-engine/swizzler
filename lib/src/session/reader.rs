@@ -21,26 +21,31 @@ pub trait FileMatch {
     /// `false` otherwise.
     fn do_match(&self, filename: &str) -> bool;
 
+    /// Returns the identifier associated to this matcher.
     fn get_identifier(&self) -> &Self::Identifier;
 
 }
 
-pub struct RegexMatcher<Identifier: Eq + Hash> {
-    id: Identifier,
-    matcher: regex::Regex
+/// Regex-based file matcher.
+///
+/// Use this to match images using a regular expression.
+#[derive(Clone)]
+pub struct RegexMatcher<Id: Eq + Hash = String> {
+    pub id: Id,
+    pub matcher: regex::Regex
 }
 
-impl<Identifier: Eq + Hash> RegexMatcher<Identifier> {
+impl<Id: Eq + Hash> RegexMatcher<Id> {
 
-    pub fn new(id: Identifier, matcher: regex::Regex) -> RegexMatcher<Identifier> {
+    pub fn new(id: Id, matcher: regex::Regex) -> RegexMatcher<Id> {
         RegexMatcher { id, matcher }
     }
 
 }
 
-impl<Identifier: Eq + Hash> FileMatch for RegexMatcher<Identifier> {
+impl<Id: Eq + Hash> FileMatch for RegexMatcher<Id> {
 
-    type Identifier = Identifier;
+    type Identifier = Id;
 
     fn do_match(&self, filename: &str) -> bool {
         self.matcher.is_match(filename)
@@ -72,22 +77,19 @@ pub trait Asset {
 
 }
 
-pub struct GenericAsset<'a, Identifier: Eq + Hash + 'a> {
+pub struct GenericAsset<'a, Id: Eq + Hash + 'a = String> {
     base: String,
-    textures: HashMap<&'a Identifier, PathBuf>
+    textures: HashMap<&'a Id, PathBuf>
 }
 
-impl<'a, Identifier: Eq + Hash> GenericAsset<'a, Identifier> {
+impl<'a, Id: Eq + Hash> GenericAsset<'a, Id> {
 
-    fn new(base: String) -> GenericAsset<'a, Identifier> {
+    fn new(base: String) -> GenericAsset<'a, Id> {
         GenericAsset { base, textures: HashMap::new() }
     }
 
-    pub fn get_texture_path(&self, id: &Identifier) -> Option<&PathBuf> {
-        match self.textures.get(id) {
-            Some(path) => Some(path),
-            _ => None
-        }
+    pub fn get_texture_path(&self, id: &Id) -> Option<&PathBuf> {
+        self.textures.get(id)
     }
 
 }
@@ -126,7 +128,7 @@ pub trait AssetReader<'a, A: Asset> {
 ///
 /// Uses ```RegexMatcher``` to match assets together into their own
 /// ```GenericAsset``` container.
-pub struct GenericAssetReader<I: Eq + Hash> {
+pub struct GenericAssetReader<I: Eq + Hash = String> {
     base: regex::Regex,
     matchers: Vec<Box<dyn FileMatch<Identifier=I>>>
 }
@@ -141,12 +143,18 @@ impl<I: Eq + Hash> GenericAssetReader<I> {
     }
 
     pub fn set_base(mut self, base: regex::Regex) -> Self {
+        // TODO: check that base as at least one capture.
         self.base = base;
         self
     }
 
     pub fn add_matcher(mut self, matcher: Box<dyn FileMatch<Identifier=I>>) -> Self {
         self.matchers.push(matcher);
+        self
+    }
+
+    pub fn set_matchers(mut self, matchers: Vec<Box<dyn FileMatch<Identifier=I>>>) -> Self {
+        self.matchers = matchers;
         self
     }
 
@@ -167,6 +175,8 @@ impl<'a, I: Eq + Hash + 'a> AssetReader<'a, GenericAsset<'a, I>> for GenericAsse
                 if base.is_none() { continue; }
 
                 let base = base.unwrap().as_str();
+
+                println!("{}", base);
 
                 let idx = result.iter()
                     .position(|e| e.base == base)
@@ -193,6 +203,7 @@ impl<'a, I: Eq + Hash + 'a> AssetReader<'a, GenericAsset<'a, I>> for GenericAsse
 
 }
 
+/// List of assets resolved relative to a given root folder.
 pub struct AssetBundle<A: Asset> {
     root: PathBuf,
     assets: Vec<A>
@@ -210,6 +221,27 @@ impl<A: Asset> AssetBundle<A> {
 
 }
 
+/// Resolves an assets directory.
+///
+/// This function generates an [`AssetBundle`] that you can process using
+/// a [`Session`].
+///
+/// The function uses the ```resolver``` argument to process recursively the
+/// folder pointed by the ```dir``` argument.
+///
+/// # Example
+///
+/// ```rust
+/// let resolver = GenericAssetReader::new();
+///
+/// // Resolves all assets in the current directory, using the `GenericAssetReader`.
+/// let assets = resolve_assets_dir(
+///     std::path::Path::new("./"),
+///     &resolver
+/// );
+/// ```
+///
+/// ```dir``
 pub fn resolve_assets_dir<'a, A: Asset, Resolver: AssetReader<'a, A>>(
     dir: &Path,
     resolver: &'a Resolver
@@ -220,7 +252,7 @@ pub fn resolve_assets_dir<'a, A: Asset, Resolver: AssetReader<'a, A>>(
     Ok(bundle)
 }
 
-// one possible implementation of walking a directory only visiting files
+/// Recursive body of `resolve_assets_dir`.
 fn resolve_dir_rec<'a, A: Asset, Resolver: AssetReader<'a, A>>(
     curr_dir: &Path,
     out: &mut Vec<A>,
@@ -232,8 +264,9 @@ fn resolve_dir_rec<'a, A: Asset, Resolver: AssetReader<'a, A>>(
     for path in &files {
         if path.is_dir() { resolve_dir_rec(path, out, resolver)?; }
     }
+    // Retains only files, so that the resolver doesn't take care of discarding
+    // paths pointing to directory.
     files.retain(|p| p.is_file());
-
     out.append(&mut resolver.resolve(&files));
     Ok(())
 }
