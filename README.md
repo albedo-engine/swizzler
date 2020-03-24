@@ -1,4 +1,4 @@
-<h1 style="text-align: center">Swizzler</h1>
+<h1 align="center">Swizzler</h1>
 
 ## Installation
 
@@ -32,10 +32,7 @@ swizzler = { git = "https://github.com/albedo-engine/swizzler.git" }
 ```
 ## CLI Usage
 
-**Swizzler!** CLI can be used either to generate a texture after cherry picking
-channels of multiple sources, or it can be run on an entire folder automatically.
-
-### Manual Swizzling
+### Manual
 
 You can generate manually a new texture by providing, for each texture source,
 which channel to extract.
@@ -77,9 +74,9 @@ And the result is:
 
 ![](TODO)
 
-### Swizzling Folder
+### Folder
 
-Sometimes, you need to process an entire hierarchy. Using the [Manual Command](#manual-swizzling) is handy, but can turn especially difficult when you need
+Sometimes, you need to process an entire hierarchy. Using the [Manual Command](#manual) is handy, but can turn especially difficult when you need
 to find what files should be grouped together.
 
 This is why **Swizzler!** comes with a second command: `session`.
@@ -134,3 +131,74 @@ example, all the metalness, roughness, and albedo textures belonging to a same
 asset would get resolved.
 
 #### `targets` attributes
+
+The targets array makes use of the `matchers` list in order to know what textures
+to use as sources. Each target will generate exaclty one texture, containing the
+combination of specificied sources.
+
+Here, we use the `metalness` and `roughness` identifiers to specify to create
+a new texture, containing **4** channels. The `red` channel will be filled with
+the metalness texture `red channel`, and the `alpha` channel will be filled with
+the roughness texture `red channel`.
+
+The `name` attribute allows you to customize the name used when saving the file,
+and the `output_format` allows you to specify an [encoding format](#arguments).
+
+You are now ready to run the session:
+
+```sh
+$ swizzler session --folder ./textures --config ./config.json
+```
+
+Alternatively, you can provide the `config.json` file on `stdin`:
+
+```sh
+$ cat ./config.json | swizzler session --folder ./textures
+```
+
+The results should be generated in the folder `__swizzler_build`, as follows:
+
+```sh
+$ ls ./__swizzler_build
+enemy-metalness-roughness.png hero-metalness-roughness.png
+```
+
+### Arguments
+
+#### Manual command
+
+Usage:
+
+```sh
+$ swizzler manual [-i PATH] ... [-i PATH]
+```
+
+|Argument|Value|Description|
+|:--:|:--:|:--------------------|
+|**-o, --output**|_Path_|Relative path to which output the texture|
+|**-i, --input**|_Path_|Relative path to the texture source to use|
+
+#### Session command
+
+Usage:
+
+```sh
+$ swizzler manual [-i PATH] ... [-i PATH]
+```
+
+|Argument|Value|Description|
+|:--:|:--:|:--------------------|
+|**-f, --folder**|_Path_|Relative path to the folder to process|
+|**-o, --output**|_[Path]_|Relative path to the folder in which to output files|
+|**-c, --config**|_[Path]_|Relative path to the config to use|
+|**-n, --num_threads**|_[Number]_|Number of threads to use. Default to the number of logical core of the machine|
+
+For the output format, here is a list of all available encoding format.
+
+* `png`
+* `jpg`
+* `tga`
+* `pnm`
+* `gif`
+* `ico`
+* `bmp`
