@@ -1,65 +1,48 @@
 mod reader;
 pub use reader::{
-    Asset,
-    AssetBundle,
-    AssetReader,
-    GenericAsset,
-    GenericAssetReader,
-    FileMatch,
-    RegexMatcher,
-    resolve_assets_dir
+    resolve_assets_dir, Asset, AssetBundle, AssetReader, FileMatch, GenericAsset,
+    GenericAssetReader, RegexMatcher,
 };
 
 mod writer;
-pub use writer::{
-    GenericTarget,
-    Target
-};
+pub use writer::{GenericTarget, Target};
 
-use std::path::{Path, PathBuf};
-
-use crate::errors::{
-    ErrorKind
-};
+use std::path::{PathBuf};
+use crate::errors::ErrorKind;
 
 struct Parameters {
-    max_nb_threads: usize
+    max_nb_threads: usize,
 }
 
 impl Parameters {
-
     fn new() -> Parameters {
         Parameters {
-            max_nb_threads: num_cpus::get()
+            max_nb_threads: num_cpus::get(),
         }
     }
-
 }
 
 pub struct Session<AssetType: Asset + Sync, T: Target<AssetType> + Sync> {
-
-    output_folder: std::path::PathBuf,
+    output_folder: PathBuf,
 
     targets: Vec<T>,
 
     parameters: Parameters,
 
-    _phantom: std::marker::PhantomData<AssetType>
-
+    _phantom: std::marker::PhantomData<AssetType>,
 }
 
 impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T> {
-
     pub fn new() -> Session<AssetType, T> {
         Session {
-            output_folder: std::path::PathBuf::from("./__swizzler_build"),
+            output_folder: PathBuf::from("./__swizzler_build"),
             targets: Vec::new(),
             parameters: Parameters::new(),
-            _phantom: std::marker::PhantomData {}
+            _phantom: std::marker::PhantomData {},
         }
     }
 
-    pub fn set_output_folder(mut self, folder: std::path::PathBuf) -> Self {
+    pub fn set_output_folder(mut self, folder: PathBuf) -> Self {
         self.output_folder = folder;
         self
     }
@@ -70,8 +53,7 @@ impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T>
 
         let errors = std::sync::Mutex::new(Vec::new());
 
-        let write_func = |target: &T, asset: &AssetType| ->
-            Result<(), ErrorKind> {
+        let write_func = |target: &T, asset: &AssetType| -> Result<(), ErrorKind> {
             let img = target.generate(asset)?;
             let mut fullpath = self.output_folder.to_path_buf();
             if let Some(p) = asset.get_folder() {
@@ -86,7 +68,7 @@ impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T>
             Ok(())
         };
 
-        let worker_func = |assets: &[ AssetType ]| {
+        let worker_func = |assets: &[AssetType]| {
             for asset in assets {
                 for target in &self.targets {
                     if let Err(e) = write_func(target, asset) {
@@ -110,9 +92,9 @@ impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T>
                     &assets[start..]
                 };
 
-                scope.spawn(move|_| (worker_func(slice)));
+                scope.spawn(move |_| (worker_func(slice)));
             }
-        });
+        }).unwrap();
 
         errors.into_inner().unwrap()
     }
@@ -131,5 +113,4 @@ impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T>
         self.parameters.max_nb_threads = count;
         self
     }
-
 }

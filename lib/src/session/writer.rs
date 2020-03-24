@@ -1,31 +1,16 @@
 use std::cmp::Eq;
 use std::hash::Hash;
 
-use image::{
-    DynamicImage,
-    ImageFormat
-};
+use image::{DynamicImage, ImageFormat};
 
-use crate::swizzler::{
-    to_luma_dyn,
-    to_lumaa_dyn,
-    to_rgb_dyn,
-    to_rgba_dyn,
-    ChannelDescriptor
-};
-use crate::errors::{
-    ErrorKind
-};
-use crate::session::{
-    Asset,
-    GenericAsset
-};
+use crate::errors::ErrorKind;
+use crate::session::{Asset, GenericAsset};
+use crate::swizzler::{to_luma_dyn, to_lumaa_dyn, to_rgb_dyn, to_rgba_dyn, ChannelDescriptor};
 
 /// Generalized texture target.
 ///
 /// Describes how to generate the final image, from a given [`Asset`].
 pub trait Target<A: Asset> {
-
     type Identifier: Hash + Eq;
 
     /// Generates the texture by swizzling channels of inputs found in the
@@ -36,15 +21,13 @@ pub trait Target<A: Asset> {
     fn get_filename(&self, asset: &A) -> String;
 
     /// Returns the encoding format this target will use when saved to disk.
-    fn get_format(&self) -> image::ImageFormat;
-
+    fn get_format(&self) -> ImageFormat;
 }
 
 /// Generic implementation of the [`Target`] trait.
 ///
 /// This allows to create target at runtime, from a config file for instance.
 pub struct GenericTarget<Identifier: Eq + Hash + Sync = String> {
-
     /// Name to append when generating the filename.
     pub name: Option<String>,
 
@@ -52,17 +35,15 @@ pub struct GenericTarget<Identifier: Eq + Hash + Sync = String> {
     pub output_format: image::ImageFormat,
 
     /// Swizzling inputs.
-    pub inputs: Vec<Option<(Identifier, u8)>>
-
+    pub inputs: Vec<Option<(Identifier, u8)>>,
 }
 
 impl<I: Eq + Hash + Sync> GenericTarget<I> {
-
     pub fn new(inputs: Vec<Option<(I, u8)>>) -> GenericTarget<I> {
         GenericTarget {
             name: None,
-            output_format: image::ImageFormat::PNG,
-            inputs
+            output_format: ImageFormat::PNG,
+            inputs,
         }
     }
 
@@ -71,7 +52,7 @@ impl<I: Eq + Hash + Sync> GenericTarget<I> {
         self
     }
 
-    pub fn set_output_format(mut self, format: image::ImageFormat) -> Self {
+    pub fn set_output_format(mut self, format: ImageFormat) -> Self {
         self.output_format = format;
         self
     }
@@ -79,51 +60,41 @@ impl<I: Eq + Hash + Sync> GenericTarget<I> {
     fn _create_descriptor(
         &self,
         index: usize,
-        asset: &GenericAsset<I>
+        asset: &GenericAsset<I>,
     ) -> Result<Option<ChannelDescriptor>, ErrorKind> {
         if let Some(input) = &self.inputs[index] {
             match asset.get_texture_path(&input.0) {
                 Some(path) => Ok(Some(ChannelDescriptor::from_path(path, input.1)?)),
-                _ => Ok(None)
+                _ => Ok(None),
             }
         } else {
             Ok(None)
         }
     }
-
 }
 
 impl<'a, I: Hash + Eq + Sync + 'a> Target<GenericAsset<'a, I>> for GenericTarget<I> {
-
     type Identifier = I;
 
     fn generate(&self, asset: &GenericAsset<'a, I>) -> Result<DynamicImage, ErrorKind> {
         match self.inputs.len() {
-            1 => {
-                to_luma_dyn(&self._create_descriptor(0, asset)?)
-            },
-            2 => {
-                to_lumaa_dyn(
-                    &self._create_descriptor(0, asset)?,
-                    &self._create_descriptor(1, asset)?
-                )
-            },
-            3 => {
-                to_rgb_dyn(
-                    &self._create_descriptor(0, asset)?,
-                    &self._create_descriptor(1, asset)?,
-                    &self._create_descriptor(2, asset)?,
-                )
-            },
-            a if a >= 4 => {
-                to_rgba_dyn(
-                    &self._create_descriptor(0, asset)?,
-                    &self._create_descriptor(1, asset)?,
-                    &self._create_descriptor(2, asset)?,
-                    &self._create_descriptor(3, asset)?
-                )
-            },
-            _ => panic!("too big vector!")
+            1 => to_luma_dyn(&self._create_descriptor(0, asset)?),
+            2 => to_lumaa_dyn(
+                &self._create_descriptor(0, asset)?,
+                &self._create_descriptor(1, asset)?,
+            ),
+            3 => to_rgb_dyn(
+                &self._create_descriptor(0, asset)?,
+                &self._create_descriptor(1, asset)?,
+                &self._create_descriptor(2, asset)?,
+            ),
+            a if a >= 4 => to_rgba_dyn(
+                &self._create_descriptor(0, asset)?,
+                &self._create_descriptor(1, asset)?,
+                &self._create_descriptor(2, asset)?,
+                &self._create_descriptor(3, asset)?,
+            ),
+            _ => panic!("too big vector!"),
         }
     }
 
@@ -135,8 +106,7 @@ impl<'a, I: Hash + Eq + Sync + 'a> Target<GenericAsset<'a, I>> for GenericTarget
         filename
     }
 
-    fn get_format(&self) -> image::ImageFormat {
+    fn get_format(&self) -> ImageFormat {
         self.output_format
     }
-
 }
