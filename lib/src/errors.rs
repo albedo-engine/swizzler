@@ -1,5 +1,7 @@
 use image;
 
+pub type SwizzleResult<T> = Result<T, ErrorKind>;
+
 #[derive(Debug)]
 pub enum ErrorKind {
     Image(image::ImageError),
@@ -7,7 +9,7 @@ pub enum ErrorKind {
     InvalidDescriptorString(String),
     NoInputs,
     InvalidSize,
-    Invalid
+    Invalid,
 }
 
 impl std::error::Error for ErrorKind {
@@ -22,9 +24,9 @@ impl std::error::Error for ErrorKind {
 impl std::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
-            ErrorKind::InvalidDescriptorString(s) =>
-                write!(f, "invalid descriptor string '{}'", s),
-            _ => write!(f, "{}", self)
+            ErrorKind::InvalidDescriptorString(s) => write!(f, "invalid descriptor string '{}'", s),
+            ErrorKind::IOError(e) => write!(f, "io error: {}", e),
+            _ => write!(f, "{:?}", self),
         }
     }
 }

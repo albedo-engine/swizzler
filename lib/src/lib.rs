@@ -1,16 +1,6 @@
 pub mod errors;
 
 mod swizzler;
-pub use swizzler::{
-    ChannelDescriptor,
-    to_rgb,
-    to_rgba,
-    to_luma,
-    to_lumaA,
-    to_dynamic
-};
+pub use swizzler::{to_dynamic, to_luma, to_lumaA, to_rgb, to_rgba, ChannelDescriptor};
 
-mod session;
-pub use session::{
-    SessionBuilder
-};
+pub mod session;
