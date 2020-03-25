@@ -72,7 +72,7 @@ $ swizzler manual --input ./source.png:b --input ./source.png:r ./source.png:g
 
 And the result is:
 
-![](TODO)
+![](./textures/rgb.png | =250x250)
 
 ### Folder
 
@@ -183,7 +183,7 @@ $ swizzler manual [-i PATH] ... [-i PATH]
 Usage:
 
 ```sh
-$ swizzler manual [-i PATH] ... [-i PATH]
+$ swizzler session --folder PATH [--config PATH_TO_CONFIG]
 ```
 
 |Argument|Value|Description|
