@@ -75,12 +75,15 @@ macro_rules! swizzle {
                 let mut dimensions: Option<(u32, u32)> = None;
 
                 $(
+                    let [<$x _channel>]: u8 = match $x {
+                        Some(desc) => desc.channel,
+                        None => 0
+                    };
+
                     let [<flat_ $x>] = match $x {
                         Some(desc) => Some(desc.img.as_ref().as_flat_samples()),
                         None => None
                     };
-
-                    let [<$x _channel>]: u8 = 0;
 
                     if let Some(sample) = &[<flat_ $x>] {
                         let img_dim = (
@@ -91,6 +94,7 @@ macro_rules! swizzle {
                         if img_dim != dimensions.unwrap() {
                             return Err(ErrorKind::InvalidSize);
                         }
+
                     }
                 )*
 
