@@ -40,13 +40,13 @@ which channel to extract.
 The CLI would look something like:
 
 ```sh
-$ swizzler --input red --input green --input blue --input alpha
+$ swizzler manual [--i red] [--i green] [--i blue] [--input a]
 ```
 
 Each channel (`red`, `green`, `blue`, and `alpha`) should be set to a texture, e.g:
 
 ```sh
-$ swizzler --input ./texture_1.png --input ./texture_2.png ...
+$ swizzler manual --i ./texture_1.png --i ./texture_2.png ...
 ```
 
 The position of each `--input` argument select the output channel. In order to
@@ -54,38 +54,38 @@ select the source channel for each input image, you have to specify it at the
 end of the source path, delimited by the `:` character:
 
 ```sh
-$ swizzler --input ./texture_1.png:2 --input ./texture_2.png:0
+$ swizzler manual --input ./texture_1.png:2 --input ./texture_2.png:0
 ```
 
-Let's have a look at an example, using the input file `source.png`:
-
-![](TODO)
-
-Let's shuffle all channels as follows:
-* The **red** channel becomes the **blue** channel
-* The **green** channel becomes the **red** channel
-* The **blue** channel becomes the **green** channel
+The number of arguments determines the number of channels of the output image. If
+only one `--input` is given, the image will be saved as _Grayscale__. If four
+`--input` are set, the image will be saved as _RGBA_. If you don't care about
+a particular channel, you can let it empty by setting it to `none`, e.g:
 
 ```sh
-$ swizzler manual --input ./source.png:b --input ./source.png:r ./source.png:g
+$ swizzler manual -i red.png:0 -i none -i none -i alpha.png:3
 ```
-
-And the result is:
-
-![](./textures/rgb.png | =250x250)
 
 ### Folder
 
-Sometimes, you need to process an entire hierarchy. Using the [Manual Command](#manual) is handy, but can turn especially difficult when you need
-to find what files should be grouped together.
-
-This is why **Swizzler!** comes with a second command: `session`.
+Sometimes, you need to process an entire hierarchy. Using the [Manual Command](#manual) is handy, but can turn especially difficult when you need to find what files should be grouped together.
 
 The `session` command let you use an advanced JSON configuration file containing
 the files to resolve together, and the textures to generate with those files. Let's
 have a look at a config file example:
 
-```json
+Let's take a look at a real life example. We have a `textures` folder containing
+the following:
+
+```sh
+$ ls ./textures
+enemy_albedo.png    enemy_metalness.png enemy_roughness.png hero_albedo.png     hero_metalness.png  hero_roughness.png
+```
+
+And a configuration file:
+
+```sh
+$ cat ./config.json
 {
   "base": "(.*)_.*",
   "matchers": [
@@ -108,27 +108,18 @@ have a look at a config file example:
 }
 ```
 
-Let's take a look at a real life example. We have a `textures` folder containing
-the following:
-
-```sh
-$ ls ./textures
-enemy_albedo.png    enemy_metalness.png enemy_roughness.png hero_albedo.png     hero_metalness.png  hero_roughness.png
-```
-
 #### `base` attribute
 
 The `base` attribute describe how to extract the name of the asset from a path.
-This **has to be** a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression) with **one** capturing group. In this examplee, the base
-captures everything before the last `_` character. All the files starting with
-`hero_` would have the base `hero`, and all the files starting with `enemy_` the
-base `enemy`.
+This **has to be** a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression) with **one** capturing group. In this example, the base captures everything before the last `_` character.
+All the files starting with `hero_` would have the base `hero`, and all the files
+starting with `enemy_` the base `enemy`.
 
 #### `matchers` attribute
 
 The matchers provide a list of files to match under the same asset. In this
-example, all the metalness, roughness, and albedo textures belonging to a same
-asset would get resolved.
+example, the metalness, roughness, and albedo textures belonging to a same
+asset will get resolved together.
 
 #### `targets` attributes
 
@@ -144,7 +135,7 @@ the roughness texture `red channel`.
 The `name` attribute allows you to customize the name used when saving the file,
 and the `output_format` allows you to specify an [encoding format](#arguments).
 
-You are now ready to run the session:
+We can now run the CLI on our `textures/` folder:
 
 ```sh
 $ swizzler session --folder ./textures --config ./config.json
@@ -163,6 +154,9 @@ $ ls ./__swizzler_build
 enemy-metalness-roughness.png hero-metalness-roughness.png
 ```
 
+For more information about all arguments accepted by the CLI, have a look at the
+[Arguments Section](#arguments)
+
 ### Arguments
 
 #### Manual command
@@ -177,6 +171,7 @@ $ swizzler manual [-i PATH] ... [-i PATH]
 |:--:|:--:|:--------------------|
 |**-o, --output**|_Path_|Relative path to which output the texture|
 |**-i, --input**|_Path_|Relative path to the texture source to use|
+|**-f, --format**|_String_|Format to use for saving. Default to the extension format if not provided|
 
 #### Session command
 
@@ -193,12 +188,24 @@ $ swizzler session --folder PATH [--config PATH_TO_CONFIG]
 |**-c, --config**|_[Path]_|Relative path to the config to use|
 |**-n, --num_threads**|_[Number]_|Number of threads to use. Default to the number of logical core of the machine|
 
-For the output format, here is a list of all available encoding format.
+List of all available encoding format:
 
 * `png`
 * `jpg`
 * `tga`
+* `tif`
 * `pnm`
-* `gif`
 * `ico`
 * `bmp`
+
+Those formats can be used directly on the CLI using the `manual` command, or via
+a configuration file (for `session` run).
+
+## Library usage
+
+### Swizzle
+
+
+
+### Running a session
+
