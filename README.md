@@ -205,8 +205,9 @@ a configuration file (for `session` run).
 
 ### Swizzle
 
-To swizzle an image, you need to create descriptors, which are structure containing
-image to read + channel to extract.
+#### Descriptors
+
+Descriptors describe how to use a source image, and what channel to extract.
 
 Descriptors can be created using a `String` to which the channel is appended,
 from a path, or even directly from a loaded image:
@@ -226,7 +227,7 @@ let descriptor = ChannelDescriptor::from_path(my_image, 0).unwrap();
 
 ```
 
-You can then use any of the following to crete a swizzled image:
+You can then use any of the following to create a swizzled image:
 
 * `to_luma()` ⟶ swizzle inputs into a _Grayscale_ image
 * `to_lumaA()` ⟶ swizzle inputs into a _Grayscale-Alpha_ image
@@ -252,6 +253,50 @@ The result image is an `ImageBuffer` from the [image crate](https://docs.rs/imag
 result.save("./output.png").unwrap();
 ```
 
-
 ### Running a session
 
+You can run a session programmatically by creating an `AssetReader` (AKA "resolver"),
+and a `Session`.
+
+```rust
+use regex::Regex;
+use swizzler::session::{
+    GenericAssetReader
+    GenericTarget,
+    RegexMatcher,
+    Session,
+};
+
+// Creates a resolver and add matcher to it.
+// Remember that matchers are used to group files together under a common asset.
+let resolver = GenericAssetReader::new()
+  .set_base(String::from("(.*)_.*)")
+  .add_matcher(
+    Box::new(RegexMatcher::new("metalness", Regex::new(r"(?i)metal(ness)?").unwrap()))
+  )
+  .add_matcher(
+    Box::new(RegexMatcher::new("roughness", Regex::new(r"(?i)rough(ness)?").unwrap()))
+  )
+
+// Creates target. Each target describes a texture to generate.
+let metal_roughness_target = GenericTarget::new(vec![
+  ("metalness", 0),
+  None,
+  None,
+  ("roughness", 0),
+])
+
+// The `Session` will generate images using multiple threads, and save them
+// to disk.
+let session = Session::new()
+  .set_output_folder(...)
+  .set_max_threads_nb(...)
+  .add_target(metal_roughness_target);
+
+// Reads all assets on the main thread, using our assets reader.
+let assets = resolve_assets_dir(&command.folder, &resolver)?;
+
+// Goes through all assets, load all sources, swizzle the textures and save them
+// to disk.
+let errors = session.run(&assets);
+```
