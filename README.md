@@ -205,6 +205,52 @@ a configuration file (for `session` run).
 
 ### Swizzle
 
+To swizzle an image, you need to create descriptors, which are structure containing
+image to read + channel to extract.
+
+Descriptors can be created using a `String` to which the channel is appended,
+from a path, or even directly from a loaded image:
+
+```rust
+use swizzler::{ChannelDescriptor};
+
+// From a string.
+let descriptor = ChannelDescriptor::from_description("./my_input.png:0").unwrap();
+
+// From path + channel
+let path = std::Path::PathBuf::from("./my_input.png");
+let descriptor = ChannelDescriptor::from_path(path, 0).unwrap();
+
+// From an image + channel
+let descriptor = ChannelDescriptor::from_path(my_image, 0).unwrap();
+
+```
+
+You can then use any of the following to crete a swizzled image:
+
+* `to_luma()` ⟶ swizzle inputs into a _Grayscale_ image
+* `to_lumaA()` ⟶ swizzle inputs into a _Grayscale-Alpha_ image
+* `to_rgb()` ⟶ swizzle inputs into a _RGB_ image
+* `to_rgba()` ⟶ swizzle inputs into a _RGBA_ image
+
+Example:
+
+```rust
+use swizzler::{to_rgba};
+
+let r_channel = ChannelDescriptor::from_path(..., ...).unwrap();
+let a_channel = ChannelDescriptor::from_path(..., ...).unwrap();
+
+let result = to_rgba(Ok(r_channel), None, None, Ok(a_channel)).unwrap();
+```
+
+> NOTE: you can use `None` to let a channel empty.
+
+The result image is an `ImageBuffer` from the [image crate](https://docs.rs/image/0.23.2/image/struct.ImageBuffer.html). You can then manipulate it like any other image, e.g:
+
+```rust
+result.save("./output.png").unwrap();
+```
 
 
 ### Running a session
