@@ -13,7 +13,7 @@ use json::Config;
 /// command.
 struct ManualCommand {
     #[structopt(long = "input", short)]
-    descriptors: Vec<String>,
+    inputs: Vec<String>,
 
     #[structopt(
         long = "output",
@@ -34,6 +34,9 @@ struct SessionCommand {
 
     #[structopt(long = "config", short, parse(from_os_str))]
     config: Option<std::path::PathBuf>,
+
+    #[structopt(long = "threads", short)]
+    num_threads: Option<usize>,
 
     #[structopt(
         long = "output",
@@ -105,7 +108,7 @@ fn process_manual(command: &ManualCommand) -> Result<(), CLIError> {
     // Converts inputs into channel descriptors, that the Swizzler library
     // can use to generate the image.
     let descriptors: Vec<Option<ChannelDescriptor>> = (command
-        .descriptors
+        .inputs
         .iter()
         .map(|s| -> Result<Option<ChannelDescriptor>, ErrorKind> {
             Ok(Some(ChannelDescriptor::from_description(&s)?))
@@ -136,7 +139,8 @@ fn process_session(command: &SessionCommand) -> Result<(), CLIError> {
     // Creates a session. This will generate all textures, and save them to disk.
     let session = Session::new()
         .set_output_folder(command.output.to_path_buf())
-        .add_targets(&mut config.targets);
+        .add_targets(&mut config.targets)
+        .set_max_threads_nb(command.num_threads);
 
     // The resolver recursively search for related files in folders. Whenever
     // it matches files together, it save them into a specific structure (an Asset),

@@ -109,8 +109,8 @@ impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T>
         self
     }
 
-    pub fn set_max_threads_nb(mut self, count: usize) -> Self {
-        self.parameters.max_nb_threads = count;
+    pub fn set_max_threads_nb(mut self, count: Option<usize>) -> Self {
+        self.parameters.max_nb_threads = count.or(Some(num_cpus::get())).unwrap();
         self
     }
 }
