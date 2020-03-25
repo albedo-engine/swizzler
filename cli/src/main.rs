@@ -1,3 +1,4 @@
+use regex;
 use std::io::Read;
 use structopt::StructOpt;
 
@@ -5,7 +6,10 @@ use swizzler::session::{resolve_assets_dir, GenericAssetReader, Session};
 use swizzler::{errors::ErrorKind, to_dynamic, ChannelDescriptor};
 
 mod json;
-use json::Config;
+use json::{
+    parse_image_format,
+    Config
+};
 
 #[derive(StructOpt)]
 #[structopt(rename_all = "kebab-case")]
@@ -22,6 +26,9 @@ struct ManualCommand {
         default_value = "output.png"
     )]
     output: std::path::PathBuf,
+
+    #[structopt(long = "format", short, parse(try_from_str = parse_image_format))]
+    format: Option<image::ImageFormat>
 }
 
 #[derive(StructOpt)]
@@ -105,18 +112,28 @@ impl From<std::io::Error> for CLIError {
 /// A manual command takes up to four input images, and swizzle their channels
 /// into a new image. This allows user to swizzle anything using this CLI.
 fn process_manual(command: &ManualCommand) -> Result<(), CLIError> {
+    let none_regex = regex::Regex::new(r"(?i)none").unwrap();
     // Converts inputs into channel descriptors, that the Swizzler library
     // can use to generate the image.
     let descriptors: Vec<Option<ChannelDescriptor>> = (command
         .inputs
         .iter()
         .map(|s| -> Result<Option<ChannelDescriptor>, ErrorKind> {
-            Ok(Some(ChannelDescriptor::from_description(&s)?))
+            if none_regex.is_match(&s) {
+                Ok(None)
+            } else {
+                Ok(Some(ChannelDescriptor::from_description(&s)?))
+            }
         })
         .collect::<Result<Vec<Option<ChannelDescriptor>>, ErrorKind>>())?;
 
     let image = to_dynamic(&descriptors)?;
-    image.save(&command.output)?;
+    if let Some(format) = command.format {
+        println!("Saving with format");
+        image.save_with_format(&command.output, format)?;
+    } else {
+        image.save(&command.output)?;
+    }
     Ok(())
 }
 

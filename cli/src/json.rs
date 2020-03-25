@@ -49,20 +49,9 @@ fn de_image_format_from_str<'de, D>(deserializer: D) -> Result<image::ImageForma
 where
     D: Deserializer<'de>,
 {
+    use serde::de::Error;
     let s = String::deserialize(deserializer)?.to_lowercase();
-    match s.as_str() {
-        "png" => Ok(ImageFormat::PNG),
-        "jpg" => Ok(ImageFormat::JPEG),
-        "tif" => Ok(ImageFormat::TIFF),
-        "tga" => Ok(ImageFormat::TGA),
-        "hdr" => Ok(ImageFormat::HDR),
-        "gif" => Ok(ImageFormat::GIF),
-        "bpm" => Ok(ImageFormat::BMP),
-        "webp" => Ok(ImageFormat::WEBP),
-        "ico" => Ok(ImageFormat::ICO),
-        "pnm" => Ok(ImageFormat::PNM),
-        _ => Ok(ImageFormat::PNG),
-    }
+    parse_image_format(&s).map_err(D::Error::custom)
 }
 
 /// Deserializes a JSON array into a Vec<Box<RegexMatcher>>.
@@ -87,4 +76,19 @@ where
 
     let v = Vec::deserialize(deserializer)?;
     Ok(v.into_iter().map(|Wrapper(a)| a).collect())
+}
+
+pub fn parse_image_format(input: &str) -> Result<image::ImageFormat, String> {
+    match input {
+        "png" => Ok(ImageFormat::PNG),
+        "jpg" | "jpeg" => Ok(ImageFormat::JPEG),
+        "tif" => Ok(ImageFormat::TIFF),
+        "tga" => Ok(ImageFormat::TGA),
+        "hdr" => Ok(ImageFormat::HDR),
+        "bpm" => Ok(ImageFormat::BMP),
+        "webp" => Ok(ImageFormat::WEBP),
+        "ico" => Ok(ImageFormat::ICO),
+        "pnm" => Ok(ImageFormat::PNM),
+        _ => Err(format!("unsupported format '{}'", input)),
+    }
 }
