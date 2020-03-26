@@ -294,9 +294,15 @@ let session = Session::new()
   .add_target(metal_roughness_target);
 
 // Reads all assets on the main thread, using our assets reader.
-let assets = resolve_assets_dir(&command.folder, &resolver)?;
+let assets = match resolve_assets_dir(&command.folder, &resolver) {
+  Some(list) => list,
+  Err(error) => eprintln!("Error reading folder: {:?}", error),
+};
 
 // Goes through all assets, load all sources, swizzle the textures and save them
 // to disk.
 let errors = session.run(&assets);
+for e in &errors {
+    eprintln!("Error processing file: {:?}", e);
+}
 ```
