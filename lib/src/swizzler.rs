@@ -50,6 +50,13 @@ impl Clone for ChannelDescriptor {
 }
 
 impl ChannelDescriptor {
+
+    /// Generates a descriptor from an image RC pointer and a channel.
+    ///
+    /// # Arguments
+    ///
+    /// * `img_input` - RC pointer to the image source
+    /// * `channel` - Source channel in the given input source
     pub fn from_image_rc(
         img_input: &std::rc::Rc<image::DynamicImage>,
         channel: u8,
@@ -58,11 +65,32 @@ impl ChannelDescriptor {
         Ok(ChannelDescriptor { img: img, channel })
     }
 
+    /// Generates a descriptor from an image and a channel.
+    ///
+    /// # Arguments
+    ///
+    /// * `img_input` - Image source
+    /// * `channel` - Source channel in the given input source
     pub fn from_image(img_input: image::DynamicImage, channel: u8) -> ChannelDescResult {
         let img = std::rc::Rc::new(img_input);
         Ok(ChannelDescriptor { img, channel })
     }
 
+    /// Generates a descriptor from a path and a channel.
+    ///
+    /// # Arguments
+    ///
+    /// * `img_input` - Image source
+    /// * `channel` - Source channel in the given input source
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::Path::PathBuf;
+    /// // Creates a descriptor pointing to file "./input.png", and set it up
+    /// // to read its `red` channel (channel 0).
+    /// let descriptor = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
+    /// ```
     pub fn from_path<T>(path: T, channel: u8) -> ChannelDescResult
     where
         T: AsRef<std::path::Path>,
@@ -71,6 +99,21 @@ impl ChannelDescriptor {
         ChannelDescriptor::from_image(img, channel)
     }
 
+    /// Generates a descriptor from a string containing the path to the image
+    /// source, to which is appended the channel to read.
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - String containing the path to the image, followed by the
+    /// separator `:` and the channel to read
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Creates a descriptor pointing to file "./input.png", and set it up
+    /// // to read its `red` channel (channel 0).
+    /// let descriptor = ChannelDescriptor::from_description("./input.png:0");
+    /// ```
     pub fn from_description<T>(input: T) -> ChannelDescResult
     where
         T: AsRef<str>,
