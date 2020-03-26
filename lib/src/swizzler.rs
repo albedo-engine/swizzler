@@ -7,6 +7,34 @@ type SwizzleResult<T> = Result<T, ErrorKind>;
 type SwizzleResultDyn = Result<DynamicImage, ErrorKind>;
 type ChannelDescResult = Result<ChannelDescriptor, ErrorKind>;
 
+/// Input source descriptor.
+///
+/// This type provides an pointer to an allocated image, as well as a channel
+/// index, representing the source to read from the image.
+///
+/// Channel descriptors are used to feed swizzling. They describe how to extract
+/// source pixel data.
+///
+/// **NOTE**: careful when creating descriptor, the channel used **must** exists.
+/// For instance, trying to access the second channel of a _Grayscale_ image
+/// will raise an error.
+///
+/// # Examples
+///
+/// You can create a [`ChannelDescriptor`] by using a path and the channel index:
+///
+/// ```
+/// use std::path::PathBuf;
+/// // Creates a descriptor pointing to the **red** channel of the `input.png` image.
+/// let descriptor = ChannelDescriptor::from_path(PathBuf::from("./input.png", 0);
+/// ```
+///
+/// You can also create a descriptor by using an image already in memory:
+///
+/// ```
+/// // Creates a descriptor pointing to the **red** channel of the image `my_image`.
+/// let descriptor = ChannelDescriptor::from_image(my_image, 0);
+/// ```
 pub struct ChannelDescriptor {
     pub channel: u8,
     pub img: std::rc::Rc<image::DynamicImage>,
@@ -127,17 +155,52 @@ macro_rules! swizzle {
     };
 }
 
-pub fn to_luma(r: &Option<ChannelDescriptor>) -> SwizzleResult<image::GrayImage> {
+/// Generates a _Grayscale_ image from a single descriptor
+///
+/// # Arguments
+///
+/// * `r` - The descriptor to use for writing the _red_ channel
+///
+/// # Example
+///
+/// ```
+/// let descriptor = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
+/// let image = to_luma(&descriptor);
+/// ```
+pub fn to_luma(r: &ChannelDescriptor) -> SwizzleResult<image::GrayImage> {
     static DEFAULT: Luma<u8> = Luma([0]);
-    swizzle!(DEFAULT, r)
+    let descriptor = Some(r);
+    swizzle!(DEFAULT, descriptor)
 }
 
-pub fn to_luma_dyn(r: &Option<ChannelDescriptor>) -> SwizzleResultDyn {
+/// Generates a _Grayscale_ image from a single descriptor, and wraps it into
+/// a `image::DynamicImage`
+///
+/// # Arguments
+///
+/// * `r` - The descriptor to use for writing the _red_ channel
+pub fn to_luma_dyn(r: &ChannelDescriptor) -> SwizzleResultDyn {
     Ok(DynamicImage::ImageLuma8(to_luma(r)?))
 }
 
-#[allow(non_snake_case)]
-pub fn to_lumaA(
+/// Generates a _Luminance Alpha_ image from two descriptors
+///
+/// **NOTE**: not all descriptors are required. When no descriptor is provided
+/// for a channel, the channel is left empty.
+///
+/// # Arguments
+///
+/// * `r` - The descriptor to use for writing the _red_ channel
+/// * `a` - The descriptor to use for writing the _alpha_ channel
+///
+/// # Example
+///
+/// ```
+/// let descriptor_r = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
+/// let descriptor_a = ChannelDescriptor::from_path(PathBuf::from("./input2.png"), 0);
+/// let image = to_luma(&Some(descriptor_r), &Some(descriptor_a));
+/// ```
+pub fn to_luma_a(
     r: &Option<ChannelDescriptor>,
     a: &Option<ChannelDescriptor>,
 ) -> SwizzleResult<image::GrayAlphaImage> {
@@ -145,13 +208,48 @@ pub fn to_lumaA(
     swizzle!(DEFAULT, r, a)
 }
 
-pub fn to_lumaa_dyn(
+/// Generates a _Luminance Alpha_ image from two descriptors, and wraps it
+/// into a `image::DynamicImage`
+///
+/// **NOTE**: not all descriptors are required. When no descriptor is provided
+/// for a channel, the channel is left empty.
+///
+/// # Arguments
+///
+/// * `r` - The descriptor to use for writing the _red_ channel
+/// * `a` - The descriptor to use for writing the _alpha_ channel
+pub fn to_luma_a_dyn(
     r: &Option<ChannelDescriptor>,
     g: &Option<ChannelDescriptor>,
 ) -> SwizzleResultDyn {
-    Ok(DynamicImage::ImageLumaA8(to_lumaA(r, g)?))
+    Ok(DynamicImage::ImageLumaA8(to_luma_a(r, g)?))
 }
 
+/// Generates a _RGB_ image from three descriptors
+///
+/// **NOTE**: not all descriptors are required. When no descriptor is provided
+/// for a channel, the channel is left empty.
+///
+/// # Arguments
+///
+/// * `r` - The descriptor to use for writing the _red_ channel
+/// * `g` - The descriptor to use for writing the _green_ channel
+/// * `b` - The descriptor to use for writing the _blue_ channel
+///
+/// # Example
+///
+/// ```
+/// use std::path::PathBuf;
+///
+/// let descriptor_r = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
+/// let descriptor_g = ChannelDescriptor::from_path(PathBuf::from("./input2.png"), 0);
+/// let descriptor_b = ChannelDescriptor::from_path(PathBuf::from("./input3.png"), 0);
+/// let image = to_rgb(
+///   &Some(descriptor_r),
+///   &Some(descriptor_g),
+///   &Some(descriptor_b)
+/// );
+/// ```
 pub fn to_rgb(
     r: &Option<ChannelDescriptor>,
     g: &Option<ChannelDescriptor>,
@@ -161,6 +259,17 @@ pub fn to_rgb(
     swizzle!(DEFAULT, r, g, b)
 }
 
+/// Generates a _RGB_ image from three descriptors, and wraps it
+/// into a `image::DynamicImage`
+///
+/// **NOTE**: not all descriptors are required. When no descriptor is provided
+/// for a channel, the channel is left empty.
+///
+/// # Arguments
+///
+/// * `r` - The descriptor to use for writing the _red_ channel
+/// * `g` - The descriptor to use for writing the _green_ channel
+/// * `b` - The descriptor to use for writing the _blue_ channel
 pub fn to_rgb_dyn(
     r: &Option<ChannelDescriptor>,
     g: &Option<ChannelDescriptor>,
@@ -169,6 +278,34 @@ pub fn to_rgb_dyn(
     Ok(DynamicImage::ImageRgb8(to_rgb(r, g, b)?))
 }
 
+/// Generates a _RGBA_ image from four descriptors.
+///
+/// **NOTE**: not all descriptors are required. When no descriptor is provided
+/// for a channel, the channel is left empty.
+///
+/// # Arguments
+///
+/// * `r` - The descriptor to use for writing the _red_ channel
+/// * `g` - The descriptor to use for writing the _green_ channel
+/// * `b` - The descriptor to use for writing the _blue_ channel
+/// * `a` - The descriptor to use for writing the _alpha_ channel
+///
+/// # Example
+///
+/// ```
+/// use std::path::PathBuf;
+///
+/// let descriptor_r = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
+/// let descriptor_g = ChannelDescriptor::from_path(PathBuf::from("./input2.png"), 0);
+/// let descriptor_b = ChannelDescriptor::from_path(PathBuf::from("./input3.png"), 0);
+/// let descriptor_a = ChannelDescriptor::from_path(PathBuf::from("./input4.png"), 0);
+/// let image = to_rgba(
+///   &Some(descriptor_r),
+///   &Some(descriptor_g),
+///   &Some(descriptor_b),
+///   &Some(descriptor_a)
+/// );
+/// ```
 pub fn to_rgba(
     r: &Option<ChannelDescriptor>,
     g: &Option<ChannelDescriptor>,
@@ -179,6 +316,18 @@ pub fn to_rgba(
     swizzle!(DEFAULT, r, g, b, a)
 }
 
+/// Generates a _RGBA_ image from three descriptors, and wraps it
+/// into a `image::DynamicImage`
+///
+/// **NOTE**: not all descriptors are required. When no descriptor is provided
+/// for a channel, the channel is left empty.
+///
+/// # Arguments
+///
+/// * `r` - The descriptor to use for writing the _red_ channel
+/// * `g` - The descriptor to use for writing the _green_ channel
+/// * `b` - The descriptor to use for writing the _blue_ channel
+/// * `a` - The descriptor to use for writing the _alpha_ channel
 pub fn to_rgba_dyn(
     r: &Option<ChannelDescriptor>,
     g: &Option<ChannelDescriptor>,
@@ -192,8 +341,13 @@ pub fn to_dynamic(
     descriptors: &Vec<Option<ChannelDescriptor>>,
 ) -> SwizzleResult<image::DynamicImage> {
     let dynimg = match descriptors.len() {
-        1 => image::DynamicImage::ImageLuma8(to_luma(&descriptors[0])?),
-        2 => image::DynamicImage::ImageLumaA8(to_lumaA(&descriptors[0], &descriptors[1])?),
+        1 => {
+            match &descriptors[0] {
+                Some(d) => image::DynamicImage::ImageLuma8(to_luma(d)?),
+                None => return Err(ErrorKind::EmptyDescriptor)
+            }
+        },
+        2 => image::DynamicImage::ImageLumaA8(to_luma_a(&descriptors[0], &descriptors[1])?),
         3 => image::DynamicImage::ImageRgb8(to_rgb(
             &descriptors[0],
             &descriptors[1],
