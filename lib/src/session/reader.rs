@@ -143,10 +143,6 @@ impl<I: Eq + Hash> GenericAssetReader<I> {
     ///
     /// Here we want the base name to be everything up to the last underscore,
     /// we can then use this regexp to extract the base:
-    ///
-    /// ```rust
-    /// set_base(Regex::new(r"(.*)_.*").unwrap())
-    /// ```
     pub fn set_base(mut self, base: regex::Regex) -> Self {
         // TODO: check that base as at least one capture.
         self.base = base;
@@ -156,12 +152,6 @@ impl<I: Eq + Hash> GenericAssetReader<I> {
     /// Adds a matcher to this reader.println
     ///
     /// All matchers will be run on all files in order to determine their type.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    ///
-    /// ```
     pub fn add_matcher(mut self, matcher: Box<dyn FileMatch<Identifier = I>>) -> Self {
         self.matchers.push(matcher);
         self
@@ -243,7 +233,9 @@ impl<A: Asset> AssetBundle<A> {
 /// # Example
 ///
 /// ```rust
-/// let resolver = GenericAssetReader::new();
+/// use swizzler::session::{resolve_assets_dir, GenericAssetReader};
+///
+/// let resolver: GenericAssetReader<String> = GenericAssetReader::new();
 ///
 /// // Resolves all assets in the current directory, using the `GenericAssetReader`.
 /// let assets = resolve_assets_dir(

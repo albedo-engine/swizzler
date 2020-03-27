@@ -25,15 +25,10 @@ type ChannelDescResult = Result<ChannelDescriptor, ErrorKind>;
 ///
 /// ```
 /// use std::path::PathBuf;
+/// use swizzler::ChannelDescriptor;
+///
 /// // Creates a descriptor pointing to the **red** channel of the `input.png` image.
-/// let descriptor = ChannelDescriptor::from_path(PathBuf::from("./input.png", 0);
-/// ```
-///
-/// You can also create a descriptor by using an image already in memory:
-///
-/// ```
-/// // Creates a descriptor pointing to the **red** channel of the image `my_image`.
-/// let descriptor = ChannelDescriptor::from_image(my_image, 0);
+/// let descriptor = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
 /// ```
 pub struct ChannelDescriptor {
     pub channel: u8,
@@ -86,7 +81,9 @@ impl ChannelDescriptor {
     /// # Examples
     ///
     /// ```
-    /// use std::Path::PathBuf;
+    /// use std::path::PathBuf;
+    /// use swizzler::ChannelDescriptor;
+    ///
     /// // Creates a descriptor pointing to file "./input.png", and set it up
     /// // to read its `red` channel (channel 0).
     /// let descriptor = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
@@ -110,6 +107,8 @@ impl ChannelDescriptor {
     /// # Examples
     ///
     /// ```
+    /// use swizzler::ChannelDescriptor;
+    ///
     /// // Creates a descriptor pointing to file "./input.png", and set it up
     /// // to read its `red` channel (channel 0).
     /// let descriptor = ChannelDescriptor::from_description("./input.png:0");
@@ -203,13 +202,6 @@ macro_rules! swizzle {
 /// # Arguments
 ///
 /// * `r` - The descriptor to use for writing the _red_ channel
-///
-/// # Example
-///
-/// ```
-/// let descriptor = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
-/// let image = to_luma(&descriptor);
-/// ```
 pub fn to_luma(r: &ChannelDescriptor) -> SwizzleResult<image::GrayImage> {
     static DEFAULT: Luma<u8> = Luma([0]);
     let descriptor = Some(r);
@@ -235,14 +227,6 @@ pub fn to_luma_dyn(r: &ChannelDescriptor) -> SwizzleResultDyn {
 ///
 /// * `r` - The descriptor to use for writing the _red_ channel
 /// * `a` - The descriptor to use for writing the _alpha_ channel
-///
-/// # Example
-///
-/// ```
-/// let descriptor_r = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
-/// let descriptor_a = ChannelDescriptor::from_path(PathBuf::from("./input2.png"), 0);
-/// let image = to_luma(&Some(descriptor_r), &Some(descriptor_a));
-/// ```
 pub fn to_luma_a(
     r: &Option<ChannelDescriptor>,
     a: &Option<ChannelDescriptor>,
@@ -278,21 +262,6 @@ pub fn to_luma_a_dyn(
 /// * `r` - The descriptor to use for writing the _red_ channel
 /// * `g` - The descriptor to use for writing the _green_ channel
 /// * `b` - The descriptor to use for writing the _blue_ channel
-///
-/// # Example
-///
-/// ```
-/// use std::path::PathBuf;
-///
-/// let descriptor_r = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
-/// let descriptor_g = ChannelDescriptor::from_path(PathBuf::from("./input2.png"), 0);
-/// let descriptor_b = ChannelDescriptor::from_path(PathBuf::from("./input3.png"), 0);
-/// let image = to_rgb(
-///   &Some(descriptor_r),
-///   &Some(descriptor_g),
-///   &Some(descriptor_b)
-/// );
-/// ```
 pub fn to_rgb(
     r: &Option<ChannelDescriptor>,
     g: &Option<ChannelDescriptor>,
@@ -332,23 +301,6 @@ pub fn to_rgb_dyn(
 /// * `g` - The descriptor to use for writing the _green_ channel
 /// * `b` - The descriptor to use for writing the _blue_ channel
 /// * `a` - The descriptor to use for writing the _alpha_ channel
-///
-/// # Example
-///
-/// ```
-/// use std::path::PathBuf;
-///
-/// let descriptor_r = ChannelDescriptor::from_path(PathBuf::from("./input.png"), 0);
-/// let descriptor_g = ChannelDescriptor::from_path(PathBuf::from("./input2.png"), 0);
-/// let descriptor_b = ChannelDescriptor::from_path(PathBuf::from("./input3.png"), 0);
-/// let descriptor_a = ChannelDescriptor::from_path(PathBuf::from("./input4.png"), 0);
-/// let image = to_rgba(
-///   &Some(descriptor_r),
-///   &Some(descriptor_g),
-///   &Some(descriptor_b),
-///   &Some(descriptor_a)
-/// );
-/// ```
 pub fn to_rgba(
     r: &Option<ChannelDescriptor>,
     g: &Option<ChannelDescriptor>,

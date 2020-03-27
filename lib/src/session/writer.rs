@@ -5,7 +5,7 @@ use image::{DynamicImage, ImageFormat};
 
 use crate::errors::ErrorKind;
 use crate::session::{Asset, GenericAsset};
-use crate::swizzler::{to_luma_dyn, to_luma_a_dyn, to_rgb_dyn, to_rgba_dyn, ChannelDescriptor};
+use crate::swizzle::{to_luma_dyn, to_luma_a_dyn, to_rgb_dyn, to_rgba_dyn, ChannelDescriptor};
 
 /// Generalized texture target.
 ///
