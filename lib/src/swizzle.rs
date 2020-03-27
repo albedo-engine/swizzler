@@ -358,3 +358,179 @@ pub fn to_dynamic(
     };
     Ok(dynimg)
 }
+
+#[cfg(test)]
+mod tests {
+
+    use image::{DynamicImage, GrayImage, GrayAlphaImage, ImageBuffer, Luma, LumaA, Rgb, Rgba, RgbImage, RgbaImage};
+    use crate::swizzle::{ChannelDescriptor, to_luma, to_luma_a, to_rgb, to_rgba};
+
+    fn assert_pixels<P: image::Pixel, Container>(
+        img: &ImageBuffer<P, Container>,
+        expected: &[ P ]
+    ) where
+        P: std::cmp::PartialEq + std::fmt::Debug + 'static,
+        Container: std::ops::Deref<Target = [P::Subpixel]>
+    {
+        let (width, _) = img.dimensions();
+        for (i, e) in expected.iter().enumerate() {
+            let x = (i as u32) % width;
+            let y = (i as u32) / width;
+            assert_eq!(
+                *img.get_pixel(x, y),
+                *e,
+                "pixel comparison failed at ({}, {})", x, y
+            );
+        }
+    }
+
+    #[test]
+    fn swizzle_grayscale() {
+        let mut img: RgbImage = ImageBuffer::new(2, 2);
+        img.put_pixel(0, 0, Rgb([128, 128, 128]));
+        img.put_pixel(1, 0, Rgb([0, 135, 97]));
+        img.put_pixel(0, 1, Rgb([255, 78, 23]));
+        img.put_pixel(1, 1, Rgb([100, 0, 255]));
+        let img = std::rc::Rc::new(DynamicImage::ImageRgb8(img));
+
+        // Test with a `red` descriptor
+        let descriptor = ChannelDescriptor::from_image_rc(&img, 0).unwrap();
+        let result = to_luma(&descriptor).unwrap();
+        assert_eq!(result.dimensions(), (2, 2));
+        assert_pixels(&result, &[ Luma([128]), Luma([0]), Luma([255]), Luma([100]) ]);
+
+        // Test with a `green` descriptor
+        let descriptor = ChannelDescriptor::from_image_rc(&img, 1).unwrap();
+        let result = to_luma(&descriptor).unwrap();
+        assert_pixels(&result, &[ Luma([128]), Luma([135]), Luma([78]), Luma([0]) ]);
+
+        // Test with a `blue` descriptor
+        let descriptor = ChannelDescriptor::from_image_rc(&img, 2).unwrap();
+        let result = to_luma(&descriptor).unwrap();
+        assert_pixels(&result, &[ Luma([128]), Luma([97]), Luma([23]), Luma([255]) ]);
+    }
+
+    #[test]
+    fn swizzle_luma_a() {
+        let mut img: GrayAlphaImage = ImageBuffer::new(2, 1);
+        img.put_pixel(0, 0, LumaA([0, 250]));
+        img.put_pixel(1, 0, LumaA([129, 13]));
+        let img = std::rc::Rc::new(DynamicImage::ImageLumaA8(img));
+
+        // Test with a `red` descriptor
+        let descriptor_r = Some(ChannelDescriptor::from_image_rc(&img, 1).unwrap());
+        let result = to_luma_a(&descriptor_r, &None).unwrap();
+        assert_eq!(result.dimensions(), (2, 1));
+        assert_pixels(&result, &[ LumaA([250, 255]),  LumaA([13, 255]) ]);
+
+        // Test with a `red` + `alpha` descriptors
+        let descriptor_a = Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap());
+        let result = to_luma_a(&descriptor_r, &descriptor_a).unwrap();
+        assert_pixels(&result, &[ LumaA([250, 0]),  LumaA([13, 129]) ]);
+    }
+
+    #[test]
+    fn swizzle_rgb() {
+        let mut img: RgbaImage = ImageBuffer::new(2, 1);
+        img.put_pixel(0, 0, Rgba([1, 2, 3, 255]));
+        img.put_pixel(1, 0, Rgba([127, 128, 126, 0]));
+        let img = std::rc::Rc::new(DynamicImage::ImageRgba8(img));
+
+        // Test to set only the `green` channel
+        let result = to_rgb(
+            &None,
+            &Some(ChannelDescriptor::from_image_rc(&img, 3).unwrap()),
+            &None
+        ).unwrap();
+        assert_eq!(result.dimensions(), (2, 1));
+        assert_pixels(&result, &[ Rgb([0, 255, 0]), Rgb([0, 0, 0]) ]);
+
+        // Test to set all channels
+        let result = to_rgb(
+            &Some(ChannelDescriptor::from_image_rc(&img, 2).unwrap()),
+            &Some(ChannelDescriptor::from_image_rc(&img, 1).unwrap()),
+            &Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap())
+        ).unwrap();
+        assert_pixels(&result, &[ Rgb([3, 2, 1]), Rgb([126, 128, 127]) ]);
+    }
+
+    #[test]
+    fn swizzle_rgba() {
+        let mut img: RgbaImage = ImageBuffer::new(2, 1);
+        img.put_pixel(0, 0, Rgba([255, 128, 0, 0]));
+        img.put_pixel(1, 0, Rgba([0, 128, 255, 255]));
+        let img = std::rc::Rc::new(DynamicImage::ImageRgba8(img));
+
+        // Test to set the `red` and `alpha` channels
+        let result = to_rgba(
+            &Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap()),
+            &None,
+            &None,
+            &Some(ChannelDescriptor::from_image_rc(&img, 3).unwrap())
+        ).unwrap();
+        assert_eq!(result.dimensions(), (2, 1));
+        assert_pixels(&result, &[ Rgba([255, 0, 0, 0]), Rgba([0, 0, 0, 255]) ]);
+
+        // Test to set all channels
+        let result = to_rgba(
+            &Some(ChannelDescriptor::from_image_rc(&img, 3).unwrap()),
+            &Some(ChannelDescriptor::from_image_rc(&img, 2).unwrap()),
+            &Some(ChannelDescriptor::from_image_rc(&img, 1).unwrap()),
+            &Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap())
+        ).unwrap();
+        assert_pixels(&result, &[ Rgba([0, 0, 128, 255]), Rgba([255, 255, 128, 0]) ]);
+    }
+
+    #[test]
+    fn swizzle_rgba_multisources() {
+        let mut img_1: GrayAlphaImage = ImageBuffer::new(2, 1);
+        img_1.put_pixel(0, 0, LumaA([77, 128]));
+        img_1.put_pixel(1, 0, LumaA([255, 0]));
+        let img_1 = DynamicImage::ImageLumaA8(img_1);
+
+        let mut img_2: RgbaImage = ImageBuffer::new(2, 1);
+        img_2.put_pixel(0, 0, Rgba([ 128, 129, 130, 131 ]));
+        img_2.put_pixel(1, 0, Rgba([ 42, 40, 12, 132 ]));
+        let img_2 = DynamicImage::ImageRgba8(img_2);
+
+        let mut img_3: GrayImage = ImageBuffer::new(2, 1);
+        img_3.put_pixel(0, 0, Luma([ 1 ]));
+        img_3.put_pixel(1, 0, Luma([ 2 ]));
+        let img_3 = DynamicImage::ImageLuma8(img_3);
+
+        let mut img_4: RgbImage = ImageBuffer::new(2, 1);
+        img_4.put_pixel(0, 0, Rgb([78, 79, 80]));
+        img_4.put_pixel(1, 0, Rgb([5, 6, 7]));
+        let img_4 = DynamicImage::ImageRgb8(img_4);
+
+        let result = to_rgba(
+            &Some(ChannelDescriptor::from_image(img_1, 1).unwrap()),
+            &Some(ChannelDescriptor::from_image(img_2, 3).unwrap()),
+            &Some(ChannelDescriptor::from_image(img_3, 0).unwrap()),
+            &Some(ChannelDescriptor::from_image(img_4, 2).unwrap())
+        ).unwrap();
+        assert_pixels(&result, &[ Rgba([128, 131, 1, 80]), Rgba([0, 132, 2, 7]) ]);
+    }
+
+    #[test]
+    fn use_non_matching_dimensions() {
+        let mut img_1: GrayImage = ImageBuffer::new(2, 1);
+        img_1.put_pixel(0, 0, Luma([ 1 ]));
+        img_1.put_pixel(1, 0, Luma([ 2 ]));
+        let img_1 = DynamicImage::ImageLuma8(img_1);
+
+        let mut img_2: RgbImage = ImageBuffer::new(1, 1);
+        img_2.put_pixel(0, 0, Rgb([0, 0, 0]));
+        let img_2 = DynamicImage::ImageRgb8(img_2);
+
+        let result = to_rgba(
+            &Some(ChannelDescriptor::from_image(img_1, 1).unwrap()),
+            &Some(ChannelDescriptor::from_image(img_2, 3).unwrap()),
+            &None,
+            &None
+        );
+
+        assert!(result.is_err(), "result should because of invalid dimensions");
+    }
+
+}
