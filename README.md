@@ -270,7 +270,7 @@ use swizzler::session::{
 // Creates a resolver and add matcher to it.
 // Remember that matchers are used to group files together under a common asset.
 let resolver = GenericAssetReader::new()
-  .set_base(String::from("(.*)_.*)")
+  .set_base(Regex::new("(.*)_.*").unwrap())
   .add_matcher(
     Box::new(RegexMatcher::new("metalness", Regex::new(r"(?i)metal(ness)?").unwrap()))
   )
