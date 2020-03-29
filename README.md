@@ -12,7 +12,7 @@ Depending on your use case, you have several options available:
 
 #### 1. Install binary from sources
 
-You can download, build and install locally the _CLI_ using:
+You can download, build, and install the _CLI_ locally using:
 
 ```sh
 $ cargo install --git https://github.com/albedo-engine/swizzler.git
@@ -37,32 +37,30 @@ swizzler = { git = "https://github.com/albedo-engine/swizzler.git" }
 
 ### Manual
 
-You can generate manually a new texture by providing, for each texture source,
-which channel to extract.
+You can manually generate a new texture by providing the channel to extract for each texture source:
 
 ```sh
 $ swizzler manual -i ./texture_1.png:0 -i ./texture_2.png:0 ...
 ```
 
-Each `-i` argument takes the input source, followed by the delimiting  character `:`, and the channel to read from the source.
+Each `-i` argument takes the input source, followed by the delimiting  character `:`, and the channel to read.
 
 The position of each `-i` argument is used to select the destination channel.
 
-For instance, if you have a _RGB_ source image (`source.png`), and you want to shuffle the channels as _BGR_, you simply need to run:
+For instance, if you have an _RGB_ source image (`source.png`), and you want to shuffle the channels as _BGR_, you simply need to run:
 
 ```sh
 $ swizzler manual -i ./source.png:2 -i ./source.png:1 -i ./source.png:0
 ```
 
-The number of arguments determines the number of channels of the output image. Calling:
+The number of arguments determines the number of channels of the output image. For instance,
+generating a _grayscale_ image is done by using:
 
 ```sh
 $ swizzler manual -i ./source.png:0
 ```
 
-Will generate a _Grayscale_ image.
-
-You can let some channels empty, by specifying the `none` keyword on a channel:
+You can leave some channels empty by specifying the `none` keyword for an input:
 
 ```sh
 $ swizzler manual -i red.png:0 -i none -i none -i alpha.png:3
@@ -70,18 +68,22 @@ $ swizzler manual -i red.png:0 -i none -i none -i alpha.png:3
 
 ### Folder processing
 
-You may want to process an entire folder hierarchy. The [Manual Command](#manual) is handy, but can turn to be difficult to use when you need to find what files should be grouped together.
+You may want to process a folder containing several textures. The [Manual Command](#manual)
+is handy but can be difficult to use when you need to find what files should be grouped together.
 
-The `session` command let you use a JSON configuration file contains information about how to resolve files, and what textures to generate.
+Let's see how you could process an entire folder of images. In this example, we
+are going to generate a texture mixing the metalness in the `red` channel, and
+the roughness in the `alpha channel`.
 
-Let's see how you could process an entire folder of images, retrieve files that belong to a common asset, and generate textures containing the metalness in the `red` channel, and the roughness in the `alpha channel`. Let's assume the textures are in a folder named `textures`:
+Let's assume we have some textures in a folder named `textures`:
 
 ```sh
 $ ls ./textures
 enemy_albedo.png    enemy_metalness.png enemy_roughness.png hero_albedo.png     hero_metalness.png  hero_roughness.png
 ```
 
-We can use this configuration file to generate our textures:
+We can define a configuration file giving **Swizzler!** information about how
+to process those textures:
 
 ```sh
 $ cat ./config.json
@@ -107,33 +109,6 @@ $ cat ./config.json
 }
 ```
 
-#### `base` attribute
-
-The `base` attribute describes how to extract the name of the asset from a path.
-This **has to be** a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression) with **one** capturing group. In this example, the base captures everything before the last `_` character.
-All the files starting with `hero_` would have the base `hero`, and all the files
-starting with `enemy_` the base `enemy`.
-
-#### `matchers` attribute
-
-The `matchers` attribute provide a list of files to match under the same asset. In this
-example, the metalness, roughness, and albedo textures belonging to a same
-asset will get resolved together.
-
-#### `targets` attributes
-
-The `targets` attribute makes use of the `matchers` list in order to know what textures
-to use as sources. Each target generates one texture, containing the
-combination of specificied sources.
-
-We use here the `metalness` and `roughness` identifiers in order to create
-a new texture, containing **4** channels. The `red` channel will be filled with
-the metalness texture `red channel`, and the `alpha` channel will be filled with
-the roughness texture `red channel`.
-
-The `name` attribute allows you to customize the name used when saving the file,
-and the `output_format` allows you to specify an [encoding format](#arguments).
-
 We can now run the CLI on our `textures/` folder:
 
 ```sh
@@ -146,15 +121,112 @@ Alternatively, you can provide the `config.json` file on `stdin`:
 $ cat ./config.json | swizzler session --folder ./textures
 ```
 
-The results should be generated in the folder `__swizzler_build`, as follows:
+The results should be generated in the folder `__swizzler_build`:
 
 ```sh
 $ ls ./__swizzler_build
 enemy-metalness-roughness.png hero-metalness-roughness.png
 ```
 
-For more information about all arguments accepted by the CLI, have a look at the
-[Arguments Section](#arguments)
+The `base` attribute was used to detect how to group files together. Each `target`
+entry was used to generate a new texture.
+
+To learn more about the available options, take a look at the
+[Configuration File section](#configuration-file).
+
+### Configuration File
+
+```json
+{
+
+  "base": String,
+
+  "matchers": [
+
+      { "id": String, "matcher": String },
+      ...
+
+  ],
+
+  "targets": [
+
+      {
+          "name": String,
+
+          "output_format": String,
+
+          "inputs": [
+
+              [ "metalness", 0 ],
+              ...
+
+          ]
+      }
+
+  ]
+}
+```
+
+#### `base` attribute
+
+The `base` attribute describes how to extract the name of the asset from a path.
+This **has to be** a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression) with **one** capturing group.
+
+Example:
+
+```json
+"base": "(.*)_.*"
+```
+
+Captures everything before the last `_` occurence.
+
+#### `matchers` attribute
+
+The `matchers` attribute provide a list of files to match under the same asset.
+
+The `id` attribute allows to retrieve the source. The `matcher` attribute provides
+a regular expression checking input files for a match.
+
+Example:
+
+```json
+"matchers": [
+    { "id": "metalness", "matcher": "(?i)metal(ness)?" },
+    { "id": "roughness", "matcher": "(?i)rough(ness)?" }
+]
+```
+
+Every file containing _"metalness"_ will be categorized under the **id** `metalness`,
+and every file containing _"roughness" will be categorized under the **id** `roughness`.
+
+#### `targets` attributes
+
+The `targets` attribute makes use of the `matchers` list to generate a new texture.
+
+The `name` attribute will get appended to the extracted base name of the asset.
+
+The `output_format` attribute is used to encode the generated image. Take a look
+at the [encoding formats](#encoding-formats) for available options.
+
+Example:
+
+```json
+"targets": [
+    {
+      "name": "-metalness-roughness.png",
+      "output_format": "png",
+      "inputs": [
+          [ "metalness", 0 ],
+          null,
+          null,
+          [ "roughness", 0 ]
+      ]
+    }
+]
+```
+
+This target configuration will create a texture with the name `'base-metalness-roughness.png'` for each asset containing a match for a
+`metalness` and `roughness` source.
 
 ### Arguments
 
@@ -187,7 +259,7 @@ $ swizzler session --folder PATH [--config PATH_TO_CONFIG]
 |**-c, --config**|_[Path]_|Relative path to the config to use|
 |**-n, --num_threads**|_[Number]_|Number of threads to use. Default to the number of logical core of the machine|
 
-List of all available encoding format:
+#### Encoding formats
 
 * `png`
 * `jpg`
