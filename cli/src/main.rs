@@ -63,7 +63,7 @@ enum Command {
 #[derive(StructOpt)]
 #[structopt(
     name = "swizzler-cli",
-    about = "Swizzle images components intp a single output",
+    about = "Swizzle multiple source images into a single image output",
     rename_all = "kebab-case"
 )]
 struct Opt {
