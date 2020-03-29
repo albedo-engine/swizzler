@@ -1,8 +1,6 @@
 use image::ImageFormat;
 use serde::{de, Deserialize, Deserializer};
-use swizzler::session::{
-    GenericTarget, RegexMatcher,
-};
+use swizzler::session::{GenericTarget, RegexMatcher};
 
 #[derive(Deserialize)]
 #[serde(remote = "RegexMatcher")]
