@@ -1,7 +1,7 @@
 [package]
 name = "swizzler"
-description = ""
-repository = "https://github.com/albedo-engine/albedo-channel-packer"
+description = "Library exposing function to swizzle images into a single output"
+repository = "https://github.com/albedo-engine/swizzler"
 version = "0.1.0"
 authors = [
     "David Peicho <david.peicho@gmail.com>"
@@ -9,9 +9,9 @@ authors = [
 edition = "2018"
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/albedo-engine/albedo-channel-packer"
-categories = ["multimedia::images"]
-keywords = ["texture", "synthesis", "procedural"]
+homepage = "https://github.com/albedo-engine/swizzler"
+categories = ["multimedia::images", "command-line-utilities"]
+keywords = ["texture", "packing", "swizzle", "rendering", "cli"]
 
 [dependencies]
 num_cpus = "1.12.0"
