@@ -1,15 +1,18 @@
 <h1 align="center">Swizzler</h1>
 
+![Swizzler Demo](/images/cli.gif)
+
+<small style="text-align: center">Thanks to the <a href="https://freepbr.com/about-free-pbr/">Free PBR</a> website for the textures used in this demo</small>
+
 ## Installation
 
-**Swizzler!** isn't available yet on [crates.io](https://crates.io).
+> NOTE: **Swizzler!** isn't available (yet) on [crates.io](https://crates.io).
 
-However, installing and running it is straighforward using [cargo](https://doc.rust-lang.org/cargo). Depending on your use case, you have several options
-available.
+Depending on your use case, you have several options available:
 
 #### 1. Install binary from sources
 
-You can download, build and install locally the CLI using:
+You can download, build and install locally the _CLI_ using:
 
 ```sh
 $ cargo install --git https://github.com/albedo-engine/swizzler.git
@@ -19,12 +22,12 @@ Check that the installation was successful:
 
 ```sh
 $ swizzler --version
+swizzler-cli 0.1.0
 ```
 
 #### 2. Install library as a dependency
 
-**Swizzler!** can also be used programmatically. If you plan on using the
-library, you can link it to your dependency by modying your `Cargo.toml` file:
+**Swizzler!** can also be used programmatically. Simply add a dependency to **Swizzler!** in your `Cargo.toml`:
 
 ```toml
 [dependencies]
@@ -37,52 +40,48 @@ swizzler = { git = "https://github.com/albedo-engine/swizzler.git" }
 You can generate manually a new texture by providing, for each texture source,
 which channel to extract.
 
-The CLI would look something like:
-
 ```sh
-$ swizzler manual [--i red] [--i green] [--i blue] [--input a]
+$ swizzler manual -i ./texture_1.png:0 -i ./texture_2.png:0 ...
 ```
 
-Each channel (`red`, `green`, `blue`, and `alpha`) should be set to a texture, e.g:
+Each `-i` argument takes the input source, followed by the delimiting  character `:`, and the channel to read from the source.
+
+The position of each `-i` argument is used to select the destination channel.
+
+For instance, if you have a _RGB_ source image (`source.png`), and you want to shuffle the channels as _BGR_, you simply need to run:
 
 ```sh
-$ swizzler manual --i ./texture_1.png --i ./texture_2.png ...
+$ swizzler manual -i ./source.png:2 -i ./source.png:1 -i ./source.png:0
 ```
 
-The position of each `--input` argument select the output channel. In order to
-select the source channel for each input image, you have to specify it at the
-end of the source path, delimited by the `:` character:
+The number of arguments determines the number of channels of the output image. Calling:
 
 ```sh
-$ swizzler manual --input ./texture_1.png:2 --input ./texture_2.png:0
+$ swizzler manual -i ./source.png:0
 ```
 
-The number of arguments determines the number of channels of the output image. If
-only one `--input` is given, the image will be saved as _Grayscale__. If four
-`--input` are set, the image will be saved as _RGBA_. If you don't care about
-a particular channel, you can let it empty by setting it to `none`, e.g:
+Will generate a _Grayscale_ image.
+
+You can let some channels empty, by specifying the `none` keyword on a channel:
 
 ```sh
 $ swizzler manual -i red.png:0 -i none -i none -i alpha.png:3
 ```
 
-### Folder
+### Folder processing
 
-Sometimes, you need to process an entire hierarchy. Using the [Manual Command](#manual) is handy, but can turn especially difficult when you need to find what files should be grouped together.
+You may want to process an entire folder hierarchy. The [Manual Command](#manual) is handy, but can turn to be difficult to use when you need to find what files should be grouped together.
 
-The `session` command let you use an advanced JSON configuration file containing
-the files to resolve together, and the textures to generate with those files. Let's
-have a look at a config file example:
+The `session` command let you use a JSON configuration file contains information about how to resolve files, and what textures to generate.
 
-Let's take a look at a real life example. We have a `textures` folder containing
-the following:
+Let's see how you could process an entire folder of images, retrieve files that belong to a common asset, and generate textures containing the metalness in the `red` channel, and the roughness in the `alpha channel`. Let's assume the textures are in a folder named `textures`:
 
 ```sh
 $ ls ./textures
 enemy_albedo.png    enemy_metalness.png enemy_roughness.png hero_albedo.png     hero_metalness.png  hero_roughness.png
 ```
 
-And a configuration file:
+We can use this configuration file to generate our textures:
 
 ```sh
 $ cat ./config.json
@@ -110,24 +109,24 @@ $ cat ./config.json
 
 #### `base` attribute
 
-The `base` attribute describe how to extract the name of the asset from a path.
+The `base` attribute describes how to extract the name of the asset from a path.
 This **has to be** a [Regular Expression](https://en.wikipedia.org/wiki/Regular_expression) with **one** capturing group. In this example, the base captures everything before the last `_` character.
 All the files starting with `hero_` would have the base `hero`, and all the files
 starting with `enemy_` the base `enemy`.
 
 #### `matchers` attribute
 
-The matchers provide a list of files to match under the same asset. In this
+The `matchers` attribute provide a list of files to match under the same asset. In this
 example, the metalness, roughness, and albedo textures belonging to a same
 asset will get resolved together.
 
 #### `targets` attributes
 
-The targets array makes use of the `matchers` list in order to know what textures
-to use as sources. Each target will generate exaclty one texture, containing the
+The `targets` attribute makes use of the `matchers` list in order to know what textures
+to use as sources. Each target generates one texture, containing the
 combination of specificied sources.
 
-Here, we use the `metalness` and `roughness` identifiers to specify to create
+We use here the `metalness` and `roughness` identifiers in order to create
 a new texture, containing **4** channels. The `red` channel will be filled with
 the metalness texture `red channel`, and the `alpha` channel will be filled with
 the roughness texture `red channel`.
@@ -205,12 +204,9 @@ a configuration file (for `session` run).
 
 ### Swizzle
 
-#### Descriptors
+Channel descriptors describe how to use a source image, and what channel to extract.
 
-Descriptors describe how to use a source image, and what channel to extract.
-
-Descriptors can be created using a `String` to which the channel is appended,
-from a path, or even directly from a loaded image:
+There are several ways to create descriptors:
 
 ```rust
 use swizzler::{ChannelDescriptor};
@@ -224,13 +220,12 @@ let descriptor = ChannelDescriptor::from_path(path, 0).unwrap();
 
 // From an image + channel
 let descriptor = ChannelDescriptor::from_path(my_image, 0).unwrap();
-
 ```
 
 You can then use any of the following to create a swizzled image:
 
 * `to_luma()` ⟶ swizzle inputs into a _Grayscale_ image
-* `to_lumaA()` ⟶ swizzle inputs into a _Grayscale-Alpha_ image
+* `to_luma_a()` ⟶ swizzle inputs into a _Grayscale-Alpha_ image
 * `to_rgb()` ⟶ swizzle inputs into a _RGB_ image
 * `to_rgba()` ⟶ swizzle inputs into a _RGBA_ image
 
@@ -242,12 +237,14 @@ use swizzler::{to_rgba};
 let r_channel = ChannelDescriptor::from_path(..., ...).unwrap();
 let a_channel = ChannelDescriptor::from_path(..., ...).unwrap();
 
-let result = to_rgba(Ok(r_channel), None, None, Ok(a_channel)).unwrap();
+// Generates a RGBA image with two descriptors. The output image `green`
+// and `blue` channels are left empty.
+let result = to_rgba(Some(r_channel), None, None, Some(a_channel)).unwrap();
 ```
 
 > NOTE: you can use `None` to let a channel empty.
 
-The result image is an `ImageBuffer` from the [image crate](https://docs.rs/image/0.23.2/image/struct.ImageBuffer.html). You can then manipulate it like any other image, e.g:
+The result image is an `ImageBuffer` from the [image crate](https://docs.rs/image/0.23.2/image/struct.ImageBuffer.html), that you can manipulate like any other image:
 
 ```rust
 result.save("./output.png").unwrap();
@@ -255,7 +252,7 @@ result.save("./output.png").unwrap();
 
 ### Running a session
 
-You can run a session programmatically by creating an `AssetReader` (AKA "resolver"),
+You can run a session programmatically by creating an `AssetReader` (A.K.A a "resolver"),
 and a `Session`.
 
 ```rust
@@ -267,8 +264,8 @@ use swizzler::session::{
     Session,
 };
 
-// Creates a resolver and add matcher to it.
-// Remember that matchers are used to group files together under a common asset.
+// Creates a resolver and add matcher to it. Remember that matchers
+// are used to group files together under a common asset.
 let resolver = GenericAssetReader::new()
   .set_base(Regex::new("(.*)_.*").unwrap())
   .add_matcher(
@@ -278,7 +275,7 @@ let resolver = GenericAssetReader::new()
     Box::new(RegexMatcher::new("roughness", Regex::new(r"(?i)rough(ness)?").unwrap()))
   )
 
-// Creates target. Each target describes a texture to generate.
+// Creates a target. Each target describes a texture to generate.
 let metal_roughness_target = GenericTarget::new(vec![
   ("metalness", 0),
   None,
