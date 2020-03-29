@@ -5,7 +5,7 @@ use image::{DynamicImage, ImageFormat};
 
 use crate::errors::ErrorKind;
 use crate::session::{Asset, GenericAsset};
-use crate::swizzle::{to_luma_dyn, to_luma_a_dyn, to_rgb_dyn, to_rgba_dyn, ChannelDescriptor};
+use crate::swizzle::{to_luma_a_dyn, to_luma_dyn, to_rgb_dyn, to_rgba_dyn, ChannelDescriptor};
 
 /// Generalized texture target.
 ///
@@ -80,7 +80,7 @@ impl<'a, I: Hash + Eq + Sync + 'a> Target<GenericAsset<'a, I>> for GenericTarget
         match self.inputs.len() {
             1 => match &self._create_descriptor(0, asset)? {
                 Some(d) => to_luma_dyn(d),
-                None => Err(ErrorKind::EmptyDescriptor)
+                None => Err(ErrorKind::EmptyDescriptor),
             },
             2 => to_luma_a_dyn(
                 &self._create_descriptor(0, asset)?,
