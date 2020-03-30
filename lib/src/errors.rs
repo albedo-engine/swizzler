@@ -26,7 +26,9 @@ impl std::fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match &self {
             ErrorKind::InvalidDescriptorString(s) => write!(f, "invalid descriptor string '{}'", s),
-            ErrorKind::EmptyDescriptor => write!(f, "luma image canno't be created with no descriptor"),
+            ErrorKind::EmptyDescriptor => {
+                write!(f, "luma image can't be created without any descriptor")
+            }
             ErrorKind::IOError(e) => write!(f, "io error: {}", e),
             _ => write!(f, "{:?}", self),
         }

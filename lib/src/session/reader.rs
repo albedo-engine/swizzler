@@ -220,6 +220,10 @@ impl<A: Asset> AssetBundle<A> {
     pub fn get_assets(&self) -> &Vec<A> {
         &self.assets
     }
+
+    pub fn count(&self) -> usize {
+        self.assets.len()
+    }
 }
 
 /// Resolves an assets directory.

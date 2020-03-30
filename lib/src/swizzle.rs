@@ -45,7 +45,6 @@ impl Clone for ChannelDescriptor {
 }
 
 impl ChannelDescriptor {
-
     /// Generates a descriptor from an image RC pointer and a channel.
     ///
     /// # Arguments
@@ -138,61 +137,61 @@ impl ChannelDescriptor {
     }
 }
 
+/// Macro swizzling multiple descriptors into a new image.
+///
+/// The maccro uses a default value, to which each pixel will be set to prior
+/// to swizzling the sources.
+///
+/// It also uses a set of sources, that will get swizzled into the result image.
 macro_rules! swizzle {
     ( $p:expr, $( $x:ident ),* ) => {
-        {
-            paste::expr! {
-                let mut dimensions: Option<(u32, u32)> = None;
-
-                $(
-                    let [<$x _channel>]: u8 = match $x {
-                        Some(desc) => desc.channel,
-                        None => 0
-                    };
-
-                    let [<flat_ $x>] = match $x {
-                        Some(desc) => Some(desc.img.as_ref().as_flat_samples()),
-                        None => None
-                    };
-
-                    if let Some(sample) = &[<flat_ $x>] {
-                        let img_dim = (
-                            sample.layout.width,
-                            sample.layout.height
-                        );
-                        dimensions.get_or_insert(img_dim);
-                        if img_dim != dimensions.unwrap() {
-                            return Err(ErrorKind::InvalidSize);
-                        }
-
+        paste::expr! {
+            let mut dimensions: Option<(u32, u32)> = None;
+            $(
+                // Saves source channel into a variable `r_channel`, etc...
+                let [<$x _channel>]: u8 = match $x {
+                    Some(desc) => desc.channel,
+                    None => 0
+                };
+                // Saves flat samples into a variable `r_flat`, etc...
+                let [<$x _flat>] = match $x {
+                    Some(desc) => Some(desc.img.as_ref().as_flat_samples()),
+                    None => None
+                };
+                // Validates that all input images have the same dimensions.
+                if let Some(sample) = &[<$x _flat>] {
+                    let img_dim = (sample.layout.width, sample.layout.height);
+                    dimensions.get_or_insert(img_dim);
+                    if img_dim != dimensions.unwrap() {
+                        return Err(ErrorKind::InvalidSize);
                     }
-                )*
 
-                let dimensions = dimensions.ok_or(ErrorKind::InvalidSize)?;
-                let mut image = image::ImageBuffer::from_pixel(
-                    dimensions.0,
-                    dimensions.1,
-                    $p
-                );
-
-                // TODO: change `i` to recursive macro computing index.
-                let mut i = 0;
-                let pixels = image.enumerate_pixels_mut();
-
-                for (x, y, pixel) in pixels {
-                    $(
-                        if let Some(sample) = &[<flat_ $x>] {
-                            pixel[i] = *sample.get_sample(
-                                [<$x _channel>], x, y
-                            ).unwrap();
-                        }
-                        i += 1;
-                    )*
-                    i = 0;
                 }
+            )*
 
-                Ok(image)
+            // Creates result image.
+            let dimensions = dimensions.ok_or(ErrorKind::InvalidSize)?;
+            let mut image = image::ImageBuffer::from_pixel(
+                dimensions.0,
+                dimensions.1,
+                $p
+            );
+
+            // Copies source pixels into result image
+            let pixels = image.enumerate_pixels_mut();
+            let mut i = 0; // TODO: change to recursive macro to compute index.
+            for (x, y, pixel) in pixels {
+                $(
+                    if let Some(sample) = &[<$x _flat>] {
+                        pixel[i] = *sample.get_sample(
+                            [<$x _channel>], x, y
+                        ).unwrap();
+                    }
+                    i += 1;
+                )*
+                i = 0;
             }
+            Ok(image)
         }
     };
 }
@@ -332,15 +331,20 @@ pub fn to_rgba_dyn(
     Ok(DynamicImage::ImageRgba8(to_rgba(r, g, b, a)?))
 }
 
+/// Generates a [`image::DynamicImage`] from a vector of descriptors. This
+/// method allows to generate an image directly from runtime data.
+///
+/// # Arguments
+///
+/// * `descriptors` - Vector of input descriptors. The number of descriptors
+/// will define the shape of the output (Luma, LumaA, RGB, RGBA)
 pub fn to_dynamic(
     descriptors: &Vec<Option<ChannelDescriptor>>,
 ) -> SwizzleResult<image::DynamicImage> {
     let dynimg = match descriptors.len() {
-        1 => {
-            match &descriptors[0] {
-                Some(d) => image::DynamicImage::ImageLuma8(to_luma(d)?),
-                None => return Err(ErrorKind::EmptyDescriptor)
-            }
+        1 => match &descriptors[0] {
+            Some(d) => image::DynamicImage::ImageLuma8(to_luma(d)?),
+            None => return Err(ErrorKind::EmptyDescriptor),
         },
         2 => image::DynamicImage::ImageLumaA8(to_luma_a(&descriptors[0], &descriptors[1])?),
         3 => image::DynamicImage::ImageRgb8(to_rgb(
@@ -362,15 +366,16 @@ pub fn to_dynamic(
 #[cfg(test)]
 mod tests {
 
-    use image::{DynamicImage, GrayImage, GrayAlphaImage, ImageBuffer, Luma, LumaA, Rgb, Rgba, RgbImage, RgbaImage};
-    use crate::swizzle::{ChannelDescriptor, to_luma, to_luma_a, to_rgb, to_rgba};
+    use crate::swizzle::{to_luma, to_luma_a, to_rgb, to_rgba, ChannelDescriptor};
+    use image::{
+        DynamicImage, GrayAlphaImage, GrayImage, ImageBuffer, Luma, LumaA, Rgb, RgbImage, Rgba,
+        RgbaImage,
+    };
 
-    fn assert_pixels<P: image::Pixel, Container>(
-        img: &ImageBuffer<P, Container>,
-        expected: &[ P ]
-    ) where
+    fn assert_pixels<P: image::Pixel, Container>(img: &ImageBuffer<P, Container>, expected: &[P])
+    where
         P: std::cmp::PartialEq + std::fmt::Debug + 'static,
-        Container: std::ops::Deref<Target = [P::Subpixel]>
+        Container: std::ops::Deref<Target = [P::Subpixel]>,
     {
         let (width, _) = img.dimensions();
         for (i, e) in expected.iter().enumerate() {
@@ -379,7 +384,9 @@ mod tests {
             assert_eq!(
                 *img.get_pixel(x, y),
                 *e,
-                "pixel comparison failed at ({}, {})", x, y
+                "pixel comparison failed at ({}, {})",
+                x,
+                y
             );
         }
     }
@@ -397,17 +404,17 @@ mod tests {
         let descriptor = ChannelDescriptor::from_image_rc(&img, 0).unwrap();
         let result = to_luma(&descriptor).unwrap();
         assert_eq!(result.dimensions(), (2, 2));
-        assert_pixels(&result, &[ Luma([128]), Luma([0]), Luma([255]), Luma([100]) ]);
+        assert_pixels(&result, &[Luma([128]), Luma([0]), Luma([255]), Luma([100])]);
 
         // Test with a `green` descriptor
         let descriptor = ChannelDescriptor::from_image_rc(&img, 1).unwrap();
         let result = to_luma(&descriptor).unwrap();
-        assert_pixels(&result, &[ Luma([128]), Luma([135]), Luma([78]), Luma([0]) ]);
+        assert_pixels(&result, &[Luma([128]), Luma([135]), Luma([78]), Luma([0])]);
 
         // Test with a `blue` descriptor
         let descriptor = ChannelDescriptor::from_image_rc(&img, 2).unwrap();
         let result = to_luma(&descriptor).unwrap();
-        assert_pixels(&result, &[ Luma([128]), Luma([97]), Luma([23]), Luma([255]) ]);
+        assert_pixels(&result, &[Luma([128]), Luma([97]), Luma([23]), Luma([255])]);
     }
 
     #[test]
@@ -421,12 +428,12 @@ mod tests {
         let descriptor_r = Some(ChannelDescriptor::from_image_rc(&img, 1).unwrap());
         let result = to_luma_a(&descriptor_r, &None).unwrap();
         assert_eq!(result.dimensions(), (2, 1));
-        assert_pixels(&result, &[ LumaA([250, 255]),  LumaA([13, 255]) ]);
+        assert_pixels(&result, &[LumaA([250, 255]), LumaA([13, 255])]);
 
         // Test with a `red` + `alpha` descriptors
         let descriptor_a = Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap());
         let result = to_luma_a(&descriptor_r, &descriptor_a).unwrap();
-        assert_pixels(&result, &[ LumaA([250, 0]),  LumaA([13, 129]) ]);
+        assert_pixels(&result, &[LumaA([250, 0]), LumaA([13, 129])]);
     }
 
     #[test]
@@ -440,18 +447,20 @@ mod tests {
         let result = to_rgb(
             &None,
             &Some(ChannelDescriptor::from_image_rc(&img, 3).unwrap()),
-            &None
-        ).unwrap();
+            &None,
+        )
+        .unwrap();
         assert_eq!(result.dimensions(), (2, 1));
-        assert_pixels(&result, &[ Rgb([0, 255, 0]), Rgb([0, 0, 0]) ]);
+        assert_pixels(&result, &[Rgb([0, 255, 0]), Rgb([0, 0, 0])]);
 
         // Test to set all channels
         let result = to_rgb(
             &Some(ChannelDescriptor::from_image_rc(&img, 2).unwrap()),
             &Some(ChannelDescriptor::from_image_rc(&img, 1).unwrap()),
-            &Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap())
-        ).unwrap();
-        assert_pixels(&result, &[ Rgb([3, 2, 1]), Rgb([126, 128, 127]) ]);
+            &Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap()),
+        )
+        .unwrap();
+        assert_pixels(&result, &[Rgb([3, 2, 1]), Rgb([126, 128, 127])]);
     }
 
     #[test]
@@ -466,19 +475,21 @@ mod tests {
             &Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap()),
             &None,
             &None,
-            &Some(ChannelDescriptor::from_image_rc(&img, 3).unwrap())
-        ).unwrap();
+            &Some(ChannelDescriptor::from_image_rc(&img, 3).unwrap()),
+        )
+        .unwrap();
         assert_eq!(result.dimensions(), (2, 1));
-        assert_pixels(&result, &[ Rgba([255, 0, 0, 0]), Rgba([0, 0, 0, 255]) ]);
+        assert_pixels(&result, &[Rgba([255, 0, 0, 0]), Rgba([0, 0, 0, 255])]);
 
         // Test to set all channels
         let result = to_rgba(
             &Some(ChannelDescriptor::from_image_rc(&img, 3).unwrap()),
             &Some(ChannelDescriptor::from_image_rc(&img, 2).unwrap()),
             &Some(ChannelDescriptor::from_image_rc(&img, 1).unwrap()),
-            &Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap())
-        ).unwrap();
-        assert_pixels(&result, &[ Rgba([0, 0, 128, 255]), Rgba([255, 255, 128, 0]) ]);
+            &Some(ChannelDescriptor::from_image_rc(&img, 0).unwrap()),
+        )
+        .unwrap();
+        assert_pixels(&result, &[Rgba([0, 0, 128, 255]), Rgba([255, 255, 128, 0])]);
     }
 
     #[test]
@@ -489,13 +500,13 @@ mod tests {
         let img_1 = DynamicImage::ImageLumaA8(img_1);
 
         let mut img_2: RgbaImage = ImageBuffer::new(2, 1);
-        img_2.put_pixel(0, 0, Rgba([ 128, 129, 130, 131 ]));
-        img_2.put_pixel(1, 0, Rgba([ 42, 40, 12, 132 ]));
+        img_2.put_pixel(0, 0, Rgba([128, 129, 130, 131]));
+        img_2.put_pixel(1, 0, Rgba([42, 40, 12, 132]));
         let img_2 = DynamicImage::ImageRgba8(img_2);
 
         let mut img_3: GrayImage = ImageBuffer::new(2, 1);
-        img_3.put_pixel(0, 0, Luma([ 1 ]));
-        img_3.put_pixel(1, 0, Luma([ 2 ]));
+        img_3.put_pixel(0, 0, Luma([1]));
+        img_3.put_pixel(1, 0, Luma([2]));
         let img_3 = DynamicImage::ImageLuma8(img_3);
 
         let mut img_4: RgbImage = ImageBuffer::new(2, 1);
@@ -507,16 +518,17 @@ mod tests {
             &Some(ChannelDescriptor::from_image(img_1, 1).unwrap()),
             &Some(ChannelDescriptor::from_image(img_2, 3).unwrap()),
             &Some(ChannelDescriptor::from_image(img_3, 0).unwrap()),
-            &Some(ChannelDescriptor::from_image(img_4, 2).unwrap())
-        ).unwrap();
-        assert_pixels(&result, &[ Rgba([128, 131, 1, 80]), Rgba([0, 132, 2, 7]) ]);
+            &Some(ChannelDescriptor::from_image(img_4, 2).unwrap()),
+        )
+        .unwrap();
+        assert_pixels(&result, &[Rgba([128, 131, 1, 80]), Rgba([0, 132, 2, 7])]);
     }
 
     #[test]
     fn use_non_matching_dimensions() {
         let mut img_1: GrayImage = ImageBuffer::new(2, 1);
-        img_1.put_pixel(0, 0, Luma([ 1 ]));
-        img_1.put_pixel(1, 0, Luma([ 2 ]));
+        img_1.put_pixel(0, 0, Luma([1]));
+        img_1.put_pixel(1, 0, Luma([2]));
         let img_1 = DynamicImage::ImageLuma8(img_1);
 
         let mut img_2: RgbImage = ImageBuffer::new(1, 1);
@@ -527,10 +539,12 @@ mod tests {
             &Some(ChannelDescriptor::from_image(img_1, 1).unwrap()),
             &Some(ChannelDescriptor::from_image(img_2, 3).unwrap()),
             &None,
-            &None
+            &None,
         );
 
-        assert!(result.is_err(), "result should because of invalid dimensions");
+        assert!(
+            result.is_err(),
+            "should be an error because of invalid dimensions"
+        );
     }
-
 }

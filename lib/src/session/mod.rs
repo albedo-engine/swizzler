@@ -7,8 +7,8 @@ pub use reader::{
 mod writer;
 pub use writer::{GenericTarget, Target};
 
-use std::path::{PathBuf};
 use crate::errors::ErrorKind;
+use std::path::PathBuf;
 
 struct Parameters {
     max_nb_threads: usize,
@@ -48,8 +48,9 @@ impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T>
     }
 
     pub fn run(&self, bundle: &AssetBundle<AssetType>) -> Vec<ErrorKind> {
-        // TODO: clean up the function
-        // TODO: remove temporary allocations of Vec
+        if bundle.count() == 0 {
+            return Vec::new();
+        }
 
         let errors = std::sync::Mutex::new(Vec::new());
 
@@ -94,7 +95,8 @@ impl<AssetType: Asset + Sync, T: Target<AssetType> + Sync> Session<AssetType, T>
 
                 scope.spawn(move |_| (worker_func(slice)));
             }
-        }).unwrap();
+        })
+        .unwrap();
 
         errors.into_inner().unwrap()
     }
