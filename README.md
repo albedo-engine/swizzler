@@ -6,8 +6,6 @@
 
 ## Installation
 
-> NOTE: **Swizzler!** isn't available (yet) on [crates.io](https://crates.io).
-
 Depending on your use case, you have several options available:
 
 #### 1. Install binary from sources
@@ -37,13 +35,13 @@ swizzler = { git = "https://github.com/albedo-engine/swizzler.git" }
 
 ### Manual
 
-You can manually generate a new texture by providing the channel to extract for each texture source:
+You can manually generate a new texture by providing the channel to extract for each source:
 
 ```sh
 $ swizzler manual -i ./texture_1.png:0 -i ./texture_2.png:0 ...
 ```
 
-Each `-i` argument takes the input source, followed by the delimiting  character `:`, and the channel to read.
+Each `-i` argument takes a source, followed by the delimiting  character `:`, and the channel to read.
 
 The position of each `-i` argument is used to select the destination channel.
 
@@ -109,6 +107,17 @@ $ cat ./config.json
 }
 ```
 
+The `base` attribute is used to extract the name of the asset (here `"hero"` or `"enemy"`).
+
+The `matchers` attribute is used to identify the type of textures. Each entry will
+look for a particular match.
+
+The `targets` attributes is used to generate new textures, using the files
+resolved by the `matchers`.
+
+To learn more about the available options, take a look at the
+[Configuration File section](#configuration-file).
+
 We can now run the CLI on our `textures/` folder:
 
 ```sh
@@ -128,15 +137,18 @@ $ ls ./__swizzler_build
 enemy-metalness-roughness.png hero-metalness-roughness.png
 ```
 
-The `base` attribute was used to detect how to group files together. Each `target`
-entry was used to generate a new texture.
+As you can see, the CLI extracted to kind of assets (`hero` and `enemy`), and
+generated two textures mixing the metalness and the roughness together:
 
-To learn more about the available options, take a look at the
-[Configuration File section](#configuration-file).
+```
+enemy-metalness-roughness.png = enemy_metalness.png + none + none + enemy_roughness.png
+hero-metalness-roughness.png = hero_metalness.png + none + none + hero_roughness.png
+```
+
 
 ### Configuration File
 
-```json
+```
 {
 
   "base": String,
@@ -184,8 +196,8 @@ Captures everything before the last `_` occurence.
 
 The `matchers` attribute provide a list of files to match under the same asset.
 
-The `id` attribute allows to retrieve the source. The `matcher` attribute provides
-a regular expression checking input files for a match.
+The `id` attribute is used to identify the file matched. The `matcher` attribute
+provides a regular expression checking input files for a match.
 
 Example:
 
@@ -196,17 +208,17 @@ Example:
 ]
 ```
 
-Every file containing _"metalness"_ will be categorized under the **id** `metalness`,
-and every file containing _"roughness" will be categorized under the **id** `roughness`.
+File containing _"metalness"_ will be assigned the **id** `metalness`,
+and files containing _"roughness" will be assigned `roughness`.
 
 #### `targets` attributes
 
 The `targets` attribute makes use of the `matchers` list to generate a new texture.
 
-The `name` attribute will get appended to the extracted base name of the asset.
+The `name` attribute is appended to the `base` name of the asset.
 
 The `output_format` attribute is used to encode the generated image. Take a look
-at the [encoding formats](#encoding-formats) for available options.
+at the [encoding formats](#encoding-formats) for all available options.
 
 Example:
 
@@ -226,7 +238,7 @@ Example:
 ```
 
 This target configuration will create a texture with the name `'base-metalness-roughness.png'` for each asset containing a match for a
-`metalness` and `roughness` source.
+`metalness` and `roughness` source. The _green_ and _blue_ channels are here left empty.
 
 ### Arguments
 
@@ -294,7 +306,7 @@ let descriptor = ChannelDescriptor::from_path(path, 0).unwrap();
 let descriptor = ChannelDescriptor::from_path(my_image, 0).unwrap();
 ```
 
-You can then use any of the following to create a swizzled image:
+You can generate a new texture from those descriptors using:
 
 * `to_luma()` ⟶ swizzle inputs into a _Grayscale_ image
 * `to_luma_a()` ⟶ swizzle inputs into a _Grayscale-Alpha_ image
@@ -314,7 +326,7 @@ let a_channel = ChannelDescriptor::from_path(..., ...).unwrap();
 let result = to_rgba(Some(r_channel), None, None, Some(a_channel)).unwrap();
 ```
 
-> NOTE: you can use `None` to let a channel empty.
+> NOTE: you can use `None` to leave a channel empty.
 
 The result image is an `ImageBuffer` from the [image crate](https://docs.rs/image/0.23.2/image/struct.ImageBuffer.html), that you can manipulate like any other image:
 
