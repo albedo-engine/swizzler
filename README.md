@@ -2,7 +2,7 @@
 
 ![Swizzler Demo](/images/cli.gif)
 
-<small style="text-align: center">Thanks to the <a href="https://freepbr.com/about-free-pbr/">Free PBR</a> website for the textures used in this demo</small>
+<p style="text-align: center">Thanks to the <a href="https://freepbr.com/about-free-pbr/">Free PBR</a> website for the textures used in this demo</p>
 
 ## Installation
 
@@ -38,10 +38,10 @@ swizzler = { git = "https://github.com/albedo-engine/swizzler.git" }
 You can manually generate a new texture by providing the channel to extract for each source:
 
 ```sh
-$ swizzler manual -i ./texture_1.png:0 -i ./texture_2.png:0 ...
+$ swizzler manual -i ./source_1.png:0 -i ./source_2.png:0 ...
 ```
 
-Each `-i` argument takes a source, followed by the delimiting  character `:`, and the channel to read.
+Each `-i` argument takes a source image followed by the delimiting  character `:` and the channel to read.
 
 The position of each `-i` argument is used to select the destination channel.
 
@@ -51,8 +51,7 @@ For instance, if you have an _RGB_ source image (`source.png`), and you want to 
 $ swizzler manual -i ./source.png:2 -i ./source.png:1 -i ./source.png:0
 ```
 
-The number of arguments determines the number of channels of the output image. For instance,
-generating a _grayscale_ image is done by using:
+The number of arguments defines the number of channels of the output image. For instance, generating a _grayscale_ image is done by using:
 
 ```sh
 $ swizzler manual -i ./source.png:0
@@ -71,17 +70,17 @@ is handy but can be difficult to use when you need to find what files should be 
 
 Let's see how you could process an entire folder of images. In this example, we
 are going to generate a texture mixing the metalness in the `red` channel, and
-the roughness in the `alpha channel`.
+the roughness in the `alpha` channel.
 
-Let's assume we have some textures in a folder named `textures`:
+Let's assume we have some textures in a folder `./textures`:
 
 ```sh
 $ ls ./textures
-enemy_albedo.png    enemy_metalness.png enemy_roughness.png hero_albedo.png     hero_metalness.png  hero_roughness.png
+enemy_albedo.png    enemy_metalness.png enemy_roughness.png
+hero_albedo.png     hero_metalness.png  hero_roughness.png
 ```
 
-We can define a configuration file giving **Swizzler!** information about how
-to process those textures:
+We can define a configuration file to process those textures:
 
 ```sh
 $ cat ./config.json
@@ -107,44 +106,37 @@ $ cat ./config.json
 }
 ```
 
-The `base` attribute is used to extract the name of the asset (here `"hero"` or `"enemy"`).
-
-The `matchers` attribute is used to identify the type of textures. Each entry will
-look for a particular match.
-
-The `targets` attributes is used to generate new textures, using the files
+*  `base` attribute is used to extract the name of the asset (here `"hero"` or `"enemy"`)
+* `matchers` attribute is used to identify the type of textures. Each entry will
+look for a particular match
+* `targets` attributes is used to generate new textures, using the files
 resolved by the `matchers`.
 
-To learn more about the available options, take a look at the
+To learn more about each attribute, please take a look at the
 [Configuration File section](#configuration-file).
 
-We can now run the CLI on our `textures/` folder:
+We can now run the CLI on our `textures` folder:
 
 ```sh
 $ swizzler session --folder ./textures --config ./config.json
 ```
 
-Alternatively, you can provide the `config.json` file on `stdin`:
+Alternatively, you can provide the `config.json` file on STDIN:
 
 ```sh
 $ cat ./config.json | swizzler session --folder ./textures
 ```
 
-The results should be generated in the folder `__swizzler_build`:
+The results will be generated in the folder `__swizzler_build`:
 
 ```sh
 $ ls ./__swizzler_build
 enemy-metalness-roughness.png hero-metalness-roughness.png
 ```
 
-As you can see, the CLI extracted to kind of assets (`hero` and `enemy`), and
-generated two textures mixing the metalness and the roughness together:
-
-```
-enemy-metalness-roughness.png = enemy_metalness.png + none + none + enemy_roughness.png
-hero-metalness-roughness.png = hero_metalness.png + none + none + hero_roughness.png
-```
-
+As you can see, the CLI extracted two kind of assets (`hero` and `enemy`), and
+generated two textures. Each generated texture contains the metalness and the
+roughness swizzled together.
 
 ### Configuration File
 
@@ -196,8 +188,8 @@ Captures everything before the last `_` occurence.
 
 The `matchers` attribute provide a list of files to match under the same asset.
 
-The `id` attribute is used to identify the file matched. The `matcher` attribute
-provides a regular expression checking input files for a match.
+* `id` is used to identify mathched files
+* `matcher` provides a regular expression checking input files for a match.
 
 Example:
 
@@ -208,16 +200,15 @@ Example:
 ]
 ```
 
-File containing _"metalness"_ will be assigned the **id** `metalness`,
-and files containing _"roughness" will be assigned `roughness`.
+In this example, file containing _"metalness"_ will be assigned the **id** `'metalness'`,
+and files containing _"roughness"_ will be assigned the **id** `'roughness'`.
 
 #### `targets` attributes
 
 The `targets` attribute makes use of the `matchers` list to generate a new texture.
 
-The `name` attribute is appended to the `base` name of the asset.
-
-The `output_format` attribute is used to encode the generated image. Take a look
+* `name` gets appended to the `base` name of the asset
+* `output_format` chooses the encoding format of the generated texture. Take a look
 at the [encoding formats](#encoding-formats) for all available options.
 
 Example:
@@ -237,8 +228,8 @@ Example:
 ]
 ```
 
-This target configuration will create a texture with the name `'base-metalness-roughness.png'` for each asset containing a match for a
-`metalness` and `roughness` source. The _green_ and _blue_ channels are here left empty.
+Here, this target configuration will create a texture with the name `'{base}-metalness-roughness.png'`, for each asset containing a match for a
+`metalness` and `roughness` source.
 
 ### Arguments
 
@@ -288,7 +279,15 @@ a configuration file (for `session` run).
 
 ### Swizzle
 
-Channel descriptors describe how to use a source image, and what channel to extract.
+You can generate a new texture from those descriptors using:
+
+* `to_luma()` ⟶ swizzle inputs into a _Grayscale_ image
+* `to_luma_a()` ⟶ swizzle inputs into a _Grayscale-Alpha_ image
+* `to_rgb()` ⟶ swizzle inputs into a _RGB_ image
+* `to_rgba()` ⟶ swizzle inputs into a _RGBA_ image
+
+Those functions use descriptors (`ChannelDescriptor`) to generate the final
+texture.
 
 There are several ways to create descriptors:
 
@@ -306,14 +305,7 @@ let descriptor = ChannelDescriptor::from_path(path, 0).unwrap();
 let descriptor = ChannelDescriptor::from_path(my_image, 0).unwrap();
 ```
 
-You can generate a new texture from those descriptors using:
-
-* `to_luma()` ⟶ swizzle inputs into a _Grayscale_ image
-* `to_luma_a()` ⟶ swizzle inputs into a _Grayscale-Alpha_ image
-* `to_rgb()` ⟶ swizzle inputs into a _RGB_ image
-* `to_rgba()` ⟶ swizzle inputs into a _RGBA_ image
-
-Example:
+Example generating a _RGBA_ texture:
 
 ```rust
 use swizzler::{to_rgba};
@@ -387,3 +379,33 @@ for e in &errors {
     eprintln!("Error processing file: {:?}", e);
 }
 ```
+
+## Contributing
+
+Contributions are welcome and appreciated!
+
+This CLI has been written as a project to learn Rust. It's the first piece of
+Rust code I've ever written, and it's likely that I made wrong design decisions.
+
+If you have any ideas about how to improve the architecture or the performance, please
+feel to contribute by raising an issue or creating a pull request.
+
+When contributing to the library, please ensure that all the tests pass using:
+
+```sh
+$ cargo test
+```
+
+The library is formatted using [rustfmt](https://github.com/rust-lang/rustfmt).
+You can run the formatter by using:
+
+```sh
+cargo fmt
+```
+
+## Notes
+
+**Swizzler!** being my first Rust project, I needed a template source code for inspiration on best practices.
+
+This CLI is heavily inspired by [Texture Synthesis](https://github.com/EmbarkStudios/texture-synthesis) from the EmbarkStudios team. Thanks for their open source
+contributions!
