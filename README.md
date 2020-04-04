@@ -6,11 +6,13 @@
 
 ## Installation
 
-Depending on your use case, you have several options available:
+### 1. Download CLI
 
-#### 1. Install binary from sources
+If you just need the **CLI**, you can download it directly in the [Release Tab](https://github.com/albedo-engine/swizzler/releases).
 
-You can download, build, and install the _CLI_ locally using:
+#### 2. Install CLI from sources
+
+Alternatively, you can download, build, and install the _CLI_ locally using:
 
 ```sh
 $ cargo install --git https://github.com/albedo-engine/swizzler.git
@@ -23,7 +25,7 @@ $ swizzler --version
 swizzler-cli 0.1.0
 ```
 
-#### 2. Install library as a dependency
+#### 3. Install library as a dependency
 
 **Swizzler!** can also be used programmatically. Simply add a dependency to **Swizzler!** in your `Cargo.toml`:
 
