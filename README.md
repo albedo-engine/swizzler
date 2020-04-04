@@ -1,8 +1,25 @@
-<h1 align="center">Swizzler</h1>
+<h1 align="center">Swizzler!</h1>
+
+<div align="center">
+  Fast CLI to pack multiple images into a single output
+</div>
 
 ![Swizzler Demo](/images/cli.gif)
 
 <p style="text-align: center">Thanks to the <a href="https://freepbr.com/about-free-pbr/">Free PBR</a> website for the textures used in this demo</p>
+
+In simple terms, **Swizzler!** can pack your textures channels together into a
+single output image.
+
+Take as an example an asset containing an _albedo_ map and an _ambient occlusion_ map.
+The _albedo_ is encoded on the **RGB** channels, and the _ambient_ is encoded only
+on the **R** channel. It's thus possible to combine them into a single **RGBA** texture containing the albedo (in the **RGB** channels) and the ambient occlusion (in the **A** channel).
+
+**Swizzler!** provides two modes:
+
+* [Manual](#manual) ⟶ Generates a single output from multiple sources
+* [Session](#session) ⟶ Traverses a directory and automatically generates
+textures based on a predefined configuration
 
 ## Installation
 
@@ -65,7 +82,7 @@ You can leave some channels empty by specifying the `none` keyword for an input:
 $ swizzler manual -i red.png:0 -i none -i none -i alpha.png:3
 ```
 
-### Folder processing
+### Session
 
 You may want to process a folder containing several textures. The [Manual Command](#manual)
 is handy but can be difficult to use when you need to find what files should be grouped together.
